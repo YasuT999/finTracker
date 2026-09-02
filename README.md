@@ -1,6 +1,6 @@
-# FinTracker — Mobile (Expo) + Web Archive
+# FinTracker — Mobile (Expo, local-only)
 
-> **Migrated Web → Mobile (local-only) — Sep 2026.** All data, transactions, budgets run offline on device via `expo-sqlite`. No cloud/backend.
+> **Migrated Web → Mobile (local-only) — Sep 2026.** All data, transactions, budgets run offline on device via `expo-sqlite`. No cloud/backend. Web removed in cutover — see `git tag mobile-cutover`.
 
 ## Quick Start (Mobile — primary)
 
@@ -21,8 +21,12 @@ See `MIGRATION_STAGES.md` for 8 staged migrations (0–8 all `[x]`).
 
 ## Archive
 
-- **Backend:** `backend.archive/` — original Hono + sql.js server (`app.ts → routes → services → repositories → libs/db.ts`). Tag `mobile-cutover`.
-- **Frontend:** `frontend/` — React 18 + Vite archive (no proxy; `vite.config.ts` proxy removed in Stage 8).
+Web removed. Retrieve original web via:
+
+```sh
+git show mobile-cutover:frontend/   # or
+git checkout mobile-cutover -- frontend backend
+```
 
 ## Project Structure
 
@@ -30,8 +34,6 @@ See `MIGRATION_STAGES.md` for 8 staged migrations (0–8 all `[x]`).
 mobile/  # Expo 57 + expo-router + expo-sqlite + NativeWind (source of truth)
   app/   # (tabs)/index( Dashboard) /years /settings + stack: years/[id] months/[id] groups/[id] categories/[id]
   src/db, repositories, services, api, contexts, components/ui, utils
-backend.archive/  # archived server
-frontend/         # archived web
 ```
 
 ## Tradeoffs (see MIGRATION_STAGES.md Stack Decision)
