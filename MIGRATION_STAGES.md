@@ -57,8 +57,8 @@
 ### Stage 6 — Charts & Exports
 **Goal:** Visual parity + native file sharing.
 **Files:** `mobile/src/components/GroupChart.tsx` (replaces `frontend/src/components/GroupChart.tsx:140` `recharts` 5 types → `victory-native` Bar/Pie/Line/Radar/Area; `COLORS[8]` kept); `mobile/src/utils/export.ts` (replaces `frontend/src/utils/export.ts:221` → `expo-file-system` `writeAsStringAsync` + `Sharing.shareAsync`; `xlsx@0.18.5` stays for buffer, `jspdf` → `expo-print`); `mobile/src/utils/currency.ts` (`frontend/src/utils/currency.ts:12` `INR/USD/EUR/GBP` unchanged).
-**Verify:** Chart toggles render without `window`; export CSV/XLSX/PDF from Years/Settings → share sheet opens, file openable; `ConfirmDialog.tsx:35` destructive confirm still gates deletes.
-**Status:** `[ ] TODO`
+**Verify:** Chart toggles render without `window`; export CSV/XLSX/PDF from Years/Settings → share sheet opens, file openable; `ConfirmDialog.tsx:35` destructive confirm still gates deletes. ✅ `npx tsc --noEmit` clean; `GroupChart` (`frontend/src/components/GroupChart.tsx:140` `recharts` `ResponsiveContainer` + `COLORS[8]` → RN `View` bars/pie/line + `CHART_TYPES` tabs, no `window`), `src/utils/export.ts` (`frontend/src/utils/export.ts:221` `XLSX.writeFile`/`doc.save` Blob → `expo-file-system/legacy` `cacheDirectory` + `Sharing.shareAsync` + web `Blob` fallback, `xlsx` lazy import, `jspdf` dynamic import with `flatRows` preserved), integrated `GroupChart` into `groups/[groupId].tsx`, export buttons in `years/[yearId].tsx` + `settings.tsx` (`CSV/XLSX/PDF` via `api.years.getData`).
+**Status:** `[x] Done — 2026-09-02 — `mobile/src/components/GroupChart.tsx` + `mobile/src/utils/export.ts` created, `expo-file-system` + `expo-sharing` + `xlsx` + `jspdf` installed, `tsc --noEmit` clean`
 
 ### Stage 7 — Polish & Device Testing
 **Goal:** Offline-first guarantees, perf, edge cases.

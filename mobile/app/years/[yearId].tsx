@@ -9,6 +9,7 @@ import { Dialog, DialogHeader, DialogTitle, DialogFooter } from "@/src/component
 import { useSettings } from "@/src/contexts/SettingsContext";
 import { formatCurrency } from "@/src/utils/currency";
 import { api } from "@/src/api";
+import { exportCSV, exportPDF, exportXLSX } from "@/src/utils/export";
 import type { Month } from "@/src/types";
 
 export default function YearDetailScreen() {
@@ -44,6 +45,17 @@ export default function YearDetailScreen() {
     try { await api.months.delete(delId); setDelId(null); load(); } catch (e: any) { Alert.alert("Error", e.message); }
   };
 
+  const handleExport = async (kind: "csv" | "xlsx" | "pdf") => {
+    try {
+      const data = await api.years.getData(id);
+      if (!data) return Alert.alert("No data");
+      const yearName = (data as any).year?.name ?? String(yearId);
+      if (kind === "csv") await exportCSV(data, yearName, settings.currency.symbol);
+      if (kind === "xlsx") await exportXLSX(data, yearName, settings.currency.symbol);
+      if (kind === "pdf") await exportPDF(data, yearName, settings.currency.symbol);
+    } catch (e: any) { Alert.alert("Export failed", e.message); }
+  };
+
   if (loading) return <View style={styles.center}><ActivityIndicator /></View>;
 
   return (
@@ -51,6 +63,11 @@ export default function YearDetailScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Year #{yearId}</Text>
         <Button onPress={() => setShowNew(true)}>+ Month</Button>
+      </View>
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        <Button size="sm" variant="outline" onPress={() => handleExport("csv")}>CSV</Button>
+        <Button size="sm" variant="outline" onPress={() => handleExport("xlsx")}>XLSX</Button>
+        <Button size="sm" variant="outline" onPress={() => handleExport("pdf")}>PDF</Button>
       </View>
       {months.length === 0 ? <Text style={styles.empty}>No months yet</Text> : months.map((m) => (
         <Card key={m.id}>

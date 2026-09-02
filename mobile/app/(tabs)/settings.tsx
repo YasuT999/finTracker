@@ -1,11 +1,38 @@
 import { StyleSheet, ScrollView, Pressable, Switch, Alert } from "react-native";
 import { Text, View } from "@/components/Themed";
+import { useEffect, useState } from "react";
 import { useSettings } from "@/src/contexts/SettingsContext";
 import { currencies } from "@/src/utils/currency";
 import { api } from "@/src/api";
+import { exportCSV, exportPDF, exportXLSX } from "@/src/utils/export";
+import { Select } from "@/src/components/ui/select";
+import { Button } from "@/src/components/ui/button";
+import { Card, CardContent } from "@/src/components/ui/card";
+import type { Year } from "@/src/types";
 
 export default function SettingsScreen() {
   const { settings, updateSettings, colorScheme } = useSettings();
+  const [years, setYears] = useState<Year[]>([]);
+  const [selectedYear, setSelectedYear] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    api.years.list().then((ys) => {
+      setYears(ys);
+      if (ys.length > 0 && !selectedYear) setSelectedYear(String(ys[0].id));
+    }).catch(() => {});
+  }, []);
+
+  const handleExport = async (kind: "csv" | "xlsx" | "pdf") => {
+    if (!selectedYear) return Alert.alert("No year selected");
+    try {
+      const data = await api.years.getData(Number(selectedYear));
+      if (!data) return Alert.alert("No data");
+      const yearName = (data as any).year?.name ?? selectedYear;
+      if (kind === "csv") await exportCSV(data, yearName, settings.currency.symbol);
+      if (kind === "xlsx") await exportXLSX(data, yearName, settings.currency.symbol);
+      if (kind === "pdf") await exportPDF(data, yearName, settings.currency.symbol);
+    } catch (e: any) { Alert.alert("Export failed", e.message); }
+  };
 
   const clearData = () => {
     Alert.alert("Clear all data?", "This deletes years, months, groups, categories, transactions.", [
@@ -68,6 +95,19 @@ export default function SettingsScreen() {
           <Switch value={settings.autoCopyPreviousMonth} onValueChange={(v) => updateSettings({ autoCopyPreviousMonth: v })} />
         </View>
       </View>
+
+      <Card>
+        <CardContent>
+          <Text style={styles.sectionTitle}>Export</Text>
+          <Text style={{ opacity: 0.6, fontSize: 12, marginBottom: 8 }}>Export year data as CSV/XLSX/PDF via share sheet.</Text>
+          {years.length > 0 ? <Select value={selectedYear} onValueChange={setSelectedYear} options={years.map((y) => ({ label: y.name, value: String(y.id) }))} placeholder="Select year" /> : <Text style={{ opacity: 0.5 }}>No years yet</Text>}
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+            <Button size="sm" variant="outline" onPress={() => handleExport("csv")}>CSV</Button>
+            <Button size="sm" variant="outline" onPress={() => handleExport("xlsx")}>XLSX</Button>
+            <Button size="sm" variant="outline" onPress={() => handleExport("pdf")}>PDF</Button>
+          </View>
+        </CardContent>
+      </Card>
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: "#d00" }]}>Danger zone</Text>

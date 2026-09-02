@@ -7,6 +7,7 @@ import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Progress } from "@/src/components/ui/progress";
 import { Dialog, DialogHeader, DialogTitle, DialogFooter } from "@/src/components/ui/dialog";
+import GroupChart from "@/src/components/GroupChart";
 import { useSettings } from "@/src/contexts/SettingsContext";
 import { formatCurrency } from "@/src/utils/currency";
 import { api } from "@/src/api";
@@ -42,6 +43,7 @@ export default function GroupDetailScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>{data.name}</Text>
       <Card><CardContent><Text>Allocated {formatCurrency(Number(data.allocated_budget), settings.currency.symbol)} · Spent {formatCurrency(data.actual_spending, settings.currency.symbol)} · Remaining {formatCurrency(data.remaining_budget, settings.currency.symbol)} · {data.utilization_percentage}%</Text><Progress value={data.utilization_percentage} style={{ marginTop: 8 }} /></CardContent></Card>
+      <GroupChart group={data as any} />
       <View style={styles.header}><Text style={styles.sectionTitle}>Categories</Text><Button size="sm" onPress={() => setShowNew(true)}>+ Category</Button></View>
       {data.categories.length === 0 ? <Text style={styles.empty}>No categories yet</Text> : data.categories.map((c) => (
         <Card key={c.id}>
