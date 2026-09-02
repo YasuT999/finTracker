@@ -69,8 +69,8 @@
 ### Stage 8 — Cutover & Cleanup
 **Goal:** Web backend retired, docs updated.
 **Files:** archive `backend/` → `backend.archive/` (or delete after tag); remove `frontend/vite.config.ts:21` proxy `/api → :3001`; update `AGENTS.md:3` commands to `cd mobile && npx expo start`; update root `README.md`; ensure `MIGRATION_STAGES.md` all `[x]`.
-**Verify:** `git status` shows no `backend/` refs; `frontend/` optionally kept for web archive or removed; `mobile` is single source of truth.
-**Status:** `[ ] TODO`
+**Verify:** `git status` shows no `backend/` refs; `frontend/` optionally kept for web archive or removed; `mobile` is single source of truth. ✅ `git tag mobile-cutover` created pre-cutover, `backend/` copied → `backend.archive/` via `Copy-Item -Recurse`, original `backend/` removed (`Remove-Item -Recurse -Force`), `git status` now shows `D backend/*` + `?? backend.archive/`, `frontend/vite.config.ts:12` proxy `/api → :3001` removed (comment: backend archived, mobile is source), `AGENTS.md:3` commands updated to `cd mobile && npx expo start`, `README.md` created (FinTracker mobile primary + archive notes), `mobile` is single source of truth; verify `cd mobile && npx tsc --noEmit` clean.
+**Status:** `[x] Done — 2026-09-02 — Stage 8 cutover complete — `backend` archived, frontend proxy removed, docs updated`
 
 ## Execution Rules (per GUIDE.md)
 
