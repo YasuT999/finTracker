@@ -11,16 +11,33 @@ export async function first<T = any>(sql: string, params: any[] = []): Promise<T
   return row ?? null;
 }
 
+function toFriendlyError(e: any): never {
+  const msg = String(e?.message ?? e);
+  if (msg.includes("UNIQUE constraint failed")) {
+    if (msg.includes("months.name")) throw Object.assign(new Error("Month already exists (name must be unique)"), { status: 400 });
+    if (msg.includes("years.name")) throw Object.assign(new Error("Year already exists (name must be unique)"), { status: 400 });
+    throw Object.assign(new Error("Duplicate entry — name must be unique"), { status: 400 });
+  }
+  if (msg.includes("CHECK constraint failed")) {
+    throw Object.assign(new Error("Validation failed — check amount/type"), { status: 400 });
+  }
+  throw e;
+}
+
 export async function execute(
   sql: string,
   params: any[] = []
 ): Promise<{ changes: number; lastInsertRowid: number }> {
   const db = await getDb();
-  const result = await db.runAsync(sql, params);
-  return {
-    changes: result.changes,
-    lastInsertRowid: result.lastInsertRowId,
-  };
+  try {
+    const result = await db.runAsync(sql, params);
+    return {
+      changes: result.changes,
+      lastInsertRowid: result.lastInsertRowId,
+    };
+  } catch (e) {
+    toFriendlyError(e);
+  }
 }
 
 export async function insert(table: string, data: Record<string, any>): Promise<number> {

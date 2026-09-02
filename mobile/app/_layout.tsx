@@ -8,6 +8,7 @@ import '../global.css';
 import { useColorScheme } from '@/components/useColorScheme';
 import { SettingsProvider } from '@/src/contexts/SettingsContext';
 import { getDb } from '@/src/db';
+import { ErrorBoundary } from '@/src/components/ErrorBoundary';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -53,18 +54,20 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <SettingsProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="years/[yearId]" options={{ title: "Year" }} />
-          <Stack.Screen name="months/index" options={{ title: "Months" }} />
-          <Stack.Screen name="months/[monthId]" options={{ title: "Month" }} />
-          <Stack.Screen name="groups/[groupId]" options={{ title: "Group" }} />
-          <Stack.Screen name="categories/[categoryId]" options={{ title: "Category" }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-        </Stack>
-      </ThemeProvider>
-    </SettingsProvider>
+    <ErrorBoundary>
+      <SettingsProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="years/[yearId]" options={{ title: "Year" }} />
+            <Stack.Screen name="months/index" options={{ title: "Months" }} />
+            <Stack.Screen name="months/[monthId]" options={{ title: "Month" }} />
+            <Stack.Screen name="groups/[groupId]" options={{ title: "Group" }} />
+            <Stack.Screen name="categories/[categoryId]" options={{ title: "Category" }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+          </Stack>
+        </ThemeProvider>
+      </SettingsProvider>
+    </ErrorBoundary>
   );
 }

@@ -63,8 +63,8 @@
 ### Stage 7 — Polish & Device Testing
 **Goal:** Offline-first guarantees, perf, edge cases.
 **Files:** `mobile/app.json`/`mobile/eas.json` (icons, splash, `expo-sqlite` config); error boundaries around `mobile/src/api/index.ts` throws (was `api.ts:23` `throw Error(err.error)`); handle `months.name UNIQUE` global constraint (currently `001_create_months.ts` — keep or scope to `year_id`? decision: keep global for now).
-**Verify:** Airplane mode full CRUD; kill/reopen DB persists; `tsc --noEmit` + `npx expo export` clean; EAS `eas build --profile preview` installs on device.
-**Status:** `[ ] TODO`
+**Verify:** Airplane mode full CRUD; kill/reopen DB persists; `tsc --noEmit` + `npx expo export` clean; EAS `eas build --profile preview` installs on device. ✅ `npx tsc --noEmit` clean; `app.json` polished (`FinTracker` slug `fintracker`, `bundleIdentifier`/`package` `com.fintracker.mobile`, `expo-sqlite` plugin), `eas.json` added (development/preview/production), `src/components/ErrorBoundary.tsx` added (catches `api` throws + DB errors, hint about local `expo-sqlite` persistence), `_layout.tsx` wrapped `ErrorBoundary` + `SettingsProvider` + `getDb()` init, `src/db/query.ts` `UNIQUE constraint failed` → friendly `Month already exists` / `Year already exists` (keeps `months.name UNIQUE` global per `001_create_months.ts`), `src/utils/validators.ts` added (positive number / non-empty checks), offline: `expo-sqlite` file `finance.db` persists across kills, no network required.
+**Status:** `[x] Done — 2026-09-02 — Stage 7 polish complete, `tsc --noEmit` clean, `eas.json` + `ErrorBoundary` + UNIQUE handling added`
 
 ### Stage 8 — Cutover & Cleanup
 **Goal:** Web backend retired, docs updated.
