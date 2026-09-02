@@ -58,6 +58,7 @@ function RootLayoutNav() {
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="years/[yearId]" options={{ title: "Year" }} />
+          <Stack.Screen name="months/index" options={{ title: "Months" }} />
           <Stack.Screen name="months/[monthId]" options={{ title: "Month" }} />
           <Stack.Screen name="groups/[groupId]" options={{ title: "Group" }} />
           <Stack.Screen name="categories/[categoryId]" options={{ title: "Category" }} />

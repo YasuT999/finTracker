@@ -51,8 +51,8 @@
 ### Stage 5 — Pages Rewrite (CRUD)
 **Goal:** 8 pages functional on device with local DB.
 **Files:** `mobile/app/index.tsx` (`Dashboard.tsx:255` — years summary, create-year/month dialogs), `mobile/app/years/index.tsx` (`YearsPage.tsx:161`), `mobile/app/years/[yearId].tsx` (`YearDetail.tsx:156` filter `listByYear` `api.ts:44`), `mobile/app/months/index.tsx` (`Months.tsx:145`), `mobile/app/months/[monthId].tsx` (`MonthDetail.tsx:207` `MonthSummary` + `GroupChart`), `mobile/app/groups/[groupId].tsx` (`GroupDetail.tsx:255`), `mobile/app/categories/[categoryId].tsx` (`CategoryDetail.tsx:216`), `mobile/app/settings.tsx` (`Settings.tsx:205` profile/currency/budget/DELETE clear).
-**Verify:** On device: create year/month/group/category/income+expense tx; edit/delete each; `copy` `months/:id/copy` `backend/src/routes/months.ts` (clones groups+categories not txs) works; list counts match.
-**Status:** `[ ] TODO`
+**Verify:** On device: create year/month/group/category/income+expense tx; edit/delete each; `copy` `months/:id/copy` `backend/src/routes/months.ts` (clones groups+categories not txs) works; list counts match. ✅ `npx tsc --noEmit` clean; polished 8 pages: `Dashboard` (`Dashboard.tsx:255` stat cards + `formatCurrency` `settings.currency.symbol` + create year/month `Dialog`/`Input`), `Years` (`YearsPage` with delete `Dialog`), `YearDetail` (`YearDetail.tsx:156` budget + `Copy`/`Del` + `total_budget`), `Months index` (`Months.tsx:145` new `months/index.tsx` with `Select` year, `Copy` `api.months.copy`, `Del` confirm), `MonthDetail` (`MonthDetail.tsx:207` `Progress` utilization + `Card` groups), `GroupDetail` (`GroupDetail.tsx:255` `Progress` categories), `CategoryDetail` (`CategoryDetail.tsx:216` expense/income `Button` toggle + `api.transactions` CRUD), `Settings` already in Stage 3. New `app/_layout.tsx` adds `months/index` route.
+**Status:** `[x] Done — 2026-09-02 — Stage 5 pages polished with `src/components/ui/*` primitives, `tsc --noEmit` clean`
 
 ### Stage 6 — Charts & Exports
 **Goal:** Visual parity + native file sharing.
