@@ -1,32 +1,73 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, FlatList, StyleSheet, View } from "react-native";
+import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { createCategory, deleteCategory, getCurrency, listCategories } from "../../src/db";
+import AddTxnSheet from "../../src/AddTxnSheet";
+import {
+  countGroupTxns,
+  createCategory,
+  deleteTransaction,
+  getCurrency,
+  getGroup,
+  listCategories,
+  listGroupTxns,
+  type GroupTxn,
+} from "../../src/db";
+import type { BudgetGroup, CategorySummary } from "../../src/types";
 import { formatCurrency } from "../../src/format";
-import type { CategorySummary } from "../../src/types";
-import { Btn, C, CategoryRow, CenterLoad, Empty, Field, Sheet } from "../../src/ui";
+import { CHART_COLORS, useTheme } from "../../src/theme";
+import { PAGE_SIZE } from "../../src/types";
+import { Btn, CenterLoad, Chip, EmptyState, FAB, Field, Segmented, Sheet, Toast, TxnRow, TXN_H } from "../../src/ui";
 
-export default function GroupCategories() {
+const FILTERS = ["All", "Income", "Expense"] as const;
+
+function colorFor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return CHART_COLORS[h % CHART_COLORS.length];
+}
+
+export default function GroupDetail() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const gid = Number(groupId);
   const router = useRouter();
+  const t = useTheme();
+  const [group, setGroup] = useState<BudgetGroup | null>(null);
   const [cats, setCats] = useState<CategorySummary[]>([]);
+  const [txns, setTxns] = useState<GroupTxn[]>([]);
+  const [total, setTotal] = useState(0);
+  const [spent, setSpent] = useState(0);
   const [currency, setCurrencyState] = useState("$");
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [showNew, setShowNew] = useState(false);
-  const [name, setName] = useState("");
-  const [budget, setBudget] = useState("");
+  const [showCat, setShowCat] = useState(false);
+  const [catName, setCatName] = useState("");
+  const [catBudget, setCatBudget] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
+
+  const f = filter === "All" ? "all" : filter === "Income" ? "income" : "expense";
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [cs, cur] = await Promise.all([listCategories(gid), getCurrency()]);
+      const [g, cs, page, n, cur] = await Promise.all([
+        getGroup(gid),
+        listCategories(gid),
+        listGroupTxns(gid, f, PAGE_SIZE, 0),
+        countGroupTxns(gid, f),
+        getCurrency(),
+      ]);
+      setGroup(g);
       setCats(cs);
+      setTxns(page);
+      setTotal(n);
+      setSpent(cs.reduce((s, c) => s + c.actual_spending, 0));
       setCurrencyState(cur);
     } finally {
       setLoading(false);
     }
-  }, [gid]);
+  }, [gid, f]);
 
   useEffect(() => {
     load();
@@ -37,62 +78,133 @@ export default function GroupCategories() {
     }, [load])
   );
 
-  const onCreate = useCallback(async () => {
-    if (!name.trim()) return;
-    await createCategory(gid, name, Number(budget) || 0);
-    setName("");
-    setBudget("");
-    setShowNew(false);
-    load();
-  }, [gid, name, budget, load]);
+  const loadMore = useCallback(async () => {
+    if (loading || loadingMore || txns.length >= total) return;
+    setLoadingMore(true);
+    try {
+      const page = await listGroupTxns(gid, f, PAGE_SIZE, txns.length);
+      setTxns((p) => [...p, ...page]);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loading, loadingMore, txns.length, total, gid, f]);
 
-  const onDelete = useCallback(
+  const say = useCallback((m: string) => {
+    setToast(m);
+    setTimeout(() => setToast(null), 1800);
+  }, []);
+
+  const onDeleteTxn = useCallback(
     (id: number) => {
-      Alert.alert("Delete category?", "Transactions inside will be deleted.", [
+      Alert.alert("Delete transaction?", undefined, [
         { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: () => deleteCategory(id).then(load) },
+        { text: "Delete", style: "destructive", onPress: () => deleteTransaction(id).then(load) },
       ]);
     },
     [load]
   );
 
+  const onFilter = useCallback((v: string) => setFilter(v as (typeof FILTERS)[number]), []);
+  const openNew = useCallback(() => setShowNew(true), []);
+  const closeNew = useCallback(() => setShowNew(false), []);
+  const onSaved = useCallback(() => {
+    load();
+    say("Saved ✓");
+  }, [load, say]);
+
+  const onCreateCat = useCallback(async () => {
+    if (!catName.trim()) return;
+    await createCategory(gid, catName, Number(catBudget) || 0);
+    setCatName("");
+    setCatBudget("");
+    setShowCat(false);
+    load();
+    say("Saved ✓");
+  }, [gid, catName, catBudget, load, say]);
+
+  const openCat = useCallback(
+    (id: number) =>
+      router.push({ pathname: "/categories/[categoryId]", params: { categoryId: String(id) } }),
+    [router]
+  );
+
   if (loading) return <CenterLoad />;
   return (
-    <View style={s.wrap}>
-      <Btn title="+ Category" onPress={() => setShowNew(true)} />
-      {cats.length === 0 ? (
-        <Empty title="No categories" hint="Add your first category." />
-      ) : (
+    <View style={[s.wrap, { backgroundColor: t.bg }]}>
+      <View style={s.head}>
+        <View style={[s.dotLg, { backgroundColor: t.accent }]} />
+        <View style={s.grow}>
+          <Text style={[s.h1, { color: t.text }]}>{group?.name ?? ""}</Text>
+          <Text style={[s.sub, { color: t.sub }]}>{formatCurrency(spent, currency)} this month</Text>
+        </View>
+      </View>
+      {cats.length > 0 ? (
         <FlatList
+          horizontal
           data={cats}
           keyExtractor={(c) => String(c.id)}
-          windowSize={7}
+          contentContainerStyle={s.chips}
+          showsHorizontalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <Chip label={item.name} dot={colorFor(item.name)} onPress={() => openCat(item.id)} />
+          )}
+        />
+      ) : null}
+      <Segmented options={[...FILTERS]} value={filter} onChange={onFilter} />
+      {txns.length === 0 ? (
+        <EmptyState title="No transactions" hint="Tap + to add one." />
+      ) : (
+        <FlatList
+          data={txns}
+          keyExtractor={(x) => String(x.id)}
+          getItemLayout={(_, i) => ({ length: TXN_H, offset: TXN_H * i, index: i })}
+          windowSize={5}
           maxToRenderPerBatch={20}
+          initialNumToRender={20}
           removeClippedSubviews
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
           contentContainerStyle={s.list}
           renderItem={({ item }) => (
-            <CategoryRow
-              name={item.name}
-              meta={`${formatCurrency(item.actual_spending, currency)} of ${formatCurrency(item.allocated_budget, currency)}`}
-              utilization={item.utilization_percentage}
-              onPress={() =>
-                router.push({ pathname: "/categories/[categoryId]", params: { categoryId: String(item.id) } })
-              }
-              onDelete={() => onDelete(item.id)}
+            <TxnRow
+              name={item.description}
+              category={item.category}
+              date={item.date}
+              amount={`${item.type === "income" ? "+" : "-"}${formatCurrency(item.amount, currency)}`}
+              isIncome={item.type === "income"}
+              color={colorFor(item.category)}
+              onDelete={() => onDeleteTxn(item.id)}
             />
           )}
         />
       )}
-      <Sheet visible={showNew} onClose={() => setShowNew(false)} title="New category">
-        <Field value={name} onChange={setName} placeholder="e.g. Groceries" />
-        <Field value={budget} onChange={setBudget} placeholder="Budget" numeric />
-        <Btn title="Create" onPress={onCreate} />
+      {cats.length === 0 ? (
+        <Btn title="＋ New category" variant="ghost" onPress={() => setShowCat(true)} block />
+      ) : null}
+      <FAB onPress={openNew} label="Add transaction" />
+      <AddTxnSheet
+        visible={showNew}
+        onClose={closeNew}
+        categories={cats}
+        onSaved={onSaved}
+      />
+      <Sheet visible={showCat} onClose={() => setShowCat(false)} title="New category">
+        <Field value={catName} onChange={setCatName} placeholder="e.g. Groceries" />
+        <Field value={catBudget} onChange={setCatBudget} placeholder="Budget" numeric />
+        <Btn title="Save" onPress={onCreateCat} block />
       </Sheet>
+      <Toast message={toast} />
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: C.bg, padding: 12, gap: 10 },
-  list: { gap: 8, paddingBottom: 24 },
+  wrap: { flex: 1, padding: 20, gap: 12 },
+  head: { flexDirection: "row", alignItems: "center", gap: 10 },
+  dotLg: { width: 16, height: 16, borderRadius: 8 },
+  grow: { flex: 1 },
+  h1: { fontSize: 28, fontWeight: "800" },
+  sub: { fontSize: 13, marginTop: 2 },
+  chips: { gap: 8 },
+  list: { gap: 8, paddingBottom: 110 },
 });

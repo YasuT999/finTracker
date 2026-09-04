@@ -37,27 +37,29 @@ You likely use nvm-windows and the terminal has a stale `PATH`: fully quit VSCod
 ## Project Structure
 
 ```
-mobile/  # Expo SDK 53 + expo-router + expo-sqlite + StyleSheet (source of truth)
+mobile/  # Expo SDK 57 + expo-router + expo-sqlite + StyleSheet (source of truth)
   app/
-    _layout.tsx            # Stack + initDb() once
-    index.tsx              # Dashboard (stats + years)
-    settings.tsx           # Currency symbol
-    years/[yearId].tsx     # Months of a year
-    months/[monthId].tsx   # Groups of a month
-    groups/[groupId].tsx   # Categories of a group
-    categories/[categoryId].tsx  # Transactions + CSV export
+    index.tsx              # Splash → redirect (onboarding/login/tabs)
+    onboarding.tsx login.tsx  # First-run + mock local profile (no backend)
+    (tabs)/                # Home (years) · Reports (charts) · Settings
+    years/[yearId].tsx     # Year pills + mini-bars + month grid
+    months/[monthId].tsx   # Month dashboard (hero, bar + donut charts, groups)
+    groups/[groupId].tsx   # Group detail (filter pills + transactions)
+    categories/[categoryId].tsx  # Category transactions + CSV export
   src/
     db.ts     # SQLite singleton, schema + indexes, SQL aggregates, pagination
-    ui.tsx    # Stateless memo'd components (props-only, no useState inside)
+    theme.ts  # Dark/Light tokens (Figma spec) + useTheme/useMode
+    ui.tsx    # Stateless memo'd components (props-only) + View-built charts
+    AddTxnSheet.tsx  # Add-transaction bottom sheet (group + category screens)
     types.ts  # Entities + summaries (PAGE_SIZE = 50)
     format.ts # formatCurrency, todayISO, pct
 ```
 
 ## How It Works
 
-- **Data:** single `src/db.ts` module (`finance.db`, WAL, FKs on). Years → months → budget groups → categories → transactions (+ `_meta` for settings).
-- **UI:** stateless components in `src/ui.tsx` — state lives in screens, data in `src/db.ts`.
-- **Performance:** `FlatList` virtualization with fixed row heights, paginated queries (`LIMIT`/`OFFSET`), totals computed in SQL, no chart/NativeWind runtime.
+- **Data:** single `src/db.ts` module (`finance.db`, WAL, FKs on). Years → months → budget groups → categories → transactions (+ `_meta` for currency/theme/onboarding/profile).
+- **UI:** dark + light themes (`src/theme.ts`, toggle in Settings); stateless components in `src/ui.tsx` — state lives in screens, data in `src/db.ts`.
+- **Performance:** `FlatList` virtualization with fixed row heights, paginated queries (`LIMIT`/`OFFSET`), totals computed in SQL, charts built from plain Views (no chart/NativeWind runtime).
 - **Export:** per-category CSV via `expo-file-system` + `expo-sharing`.
 
 See `AGENTS.md` for agent build/verify commands and perf rules.

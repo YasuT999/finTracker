@@ -1,24 +1,34 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
-import { useFocusEffect, useLocalSearchParams } from "expo-router";
-import * as FileSystem from "expo-file-system";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
+import AddTxnSheet from "../../src/AddTxnSheet";
 import {
   categoryCsv,
   countTransactions,
-  createTransaction,
+  deleteCategory,
   deleteTransaction,
   getCategorySummary,
   getCurrency,
   listTransactions,
 } from "../../src/db";
-import { formatCurrency, todayISO } from "../../src/format";
+import { formatCurrency } from "../../src/format";
+import { CHART_COLORS, useTheme } from "../../src/theme";
 import { PAGE_SIZE, type CategorySummary, type Transaction } from "../../src/types";
-import { Btn, C, Card, CenterLoad, Empty, Field, Sheet, Stat, TxnRow, TXN_H } from "../../src/ui";
+import { Btn, Card, CenterLoad, EmptyState, FAB, Stat, Toast, TxnRow, TXN_H } from "../../src/ui";
+
+function colorFor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return CHART_COLORS[h % CHART_COLORS.length];
+}
 
 export default function CategoryTxns() {
   const { categoryId } = useLocalSearchParams<{ categoryId: string }>();
   const cid = Number(categoryId);
+  const router = useRouter();
+  const t = useTheme();
   const [summary, setSummary] = useState<CategorySummary | null>(null);
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [total, setTotal] = useState(0);
@@ -26,9 +36,7 @@ export default function CategoryTxns() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [showNew, setShowNew] = useState(false);
-  const [desc, setDesc] = useState("");
-  const [amount, setAmount] = useState("");
-  const [type, setType] = useState<"income" | "expense">("expense");
+  const [toast, setToast] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,18 +76,10 @@ export default function CategoryTxns() {
     }
   }, [loading, loadingMore, txns.length, total, cid]);
 
-  const onCreate = useCallback(async () => {
-    try {
-      await createTransaction(cid, Number(amount), type, desc, todayISO());
-      setDesc("");
-      setAmount("");
-      setType("expense");
-      setShowNew(false);
-      load();
-    } catch (e) {
-      Alert.alert("Error", (e as Error).message);
-    }
-  }, [cid, amount, type, desc, load]);
+  const say = useCallback((m: string) => {
+    setToast(m);
+    setTimeout(() => setToast(null), 1800);
+  }, []);
 
   const onDelete = useCallback(
     (id: number) => {
@@ -91,45 +91,62 @@ export default function CategoryTxns() {
     [load]
   );
 
+  const onDeleteCat = useCallback(() => {
+    Alert.alert("Delete category?", "Transactions inside will be deleted.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          await deleteCategory(cid);
+          router.back();
+        },
+      },
+    ]);
+  }, [cid, router]);
+
   const onExport = useCallback(async () => {
     try {
       const csv = await categoryCsv(cid);
-      const path = `${FileSystem.documentDirectory ?? FileSystem.cacheDirectory}category-${cid}.csv`;
-      await FileSystem.writeAsStringAsync(path, csv);
-      await Sharing.shareAsync(path);
+      const file = new File(Paths.cache, `category-${cid}.csv`);
+      await file.write(csv);
+      await Sharing.shareAsync(file.uri);
     } catch (e) {
       Alert.alert("Export failed", (e as Error).message);
     }
   }, [cid]);
 
+  const fmt = useCallback((n: number) => formatCurrency(n, currency), [currency]);
   const openNew = useCallback(() => setShowNew(true), []);
   const closeNew = useCallback(() => setShowNew(false), []);
-  const toExpense = useCallback(() => setType("expense"), []);
-  const toIncome = useCallback(() => setType("income"), []);
+  const onSaved = useCallback(() => {
+    load();
+    say("Saved ✓");
+  }, [load, say]);
 
   if (loading) return <CenterLoad />;
   return (
-    <View style={s.wrap}>
+    <View style={[s.wrap, { backgroundColor: t.bg }]}>
+      <Text style={[s.h1, { color: t.text }]}>{summary?.name ?? ""}</Text>
       <Card>
-        <Text style={s.title}>{summary?.name ?? ""}</Text>
         <View style={s.stats}>
-          <Stat label="Spent" value={formatCurrency(summary?.actual_spending ?? 0, currency)} />
-          <Stat label="Left" value={formatCurrency(summary?.remaining_budget ?? 0, currency)} />
+          <Stat label="Spent" value={fmt(summary?.actual_spending ?? 0)} />
+          <Stat label="Left" value={fmt(summary?.remaining_budget ?? 0)} />
         </View>
-        <Text style={s.sub}>
+        <Text style={[s.sub, { color: t.sub }]}>
           {txns.length} of {total} · {summary?.utilization_percentage ?? 0}% used
         </Text>
       </Card>
       <View style={s.bar}>
-        <Btn title="+ Transaction" onPress={openNew} />
-        <Btn title="Export CSV" variant="outline" onPress={onExport} />
+        <Btn title="Export CSV" variant="ghost" size="sm" onPress={onExport} />
+        <Btn title="Delete category" variant="ghost" size="sm" onPress={onDeleteCat} />
       </View>
       {txns.length === 0 ? (
-        <Empty title="No transactions" hint="Add your first transaction." />
+        <EmptyState title="No transactions" hint="Tap + to add one." />
       ) : (
         <FlatList
           data={txns}
-          keyExtractor={(t) => String(t.id)}
+          keyExtractor={(x) => String(x.id)}
           getItemLayout={(_, i) => ({ length: TXN_H, offset: TXN_H * i, index: i })}
           windowSize={5}
           maxToRenderPerBatch={20}
@@ -140,33 +157,35 @@ export default function CategoryTxns() {
           contentContainerStyle={s.list}
           renderItem={({ item }) => (
             <TxnRow
-              description={item.description}
-              meta={`${item.date} · ${item.type}`}
-              amount={`${item.type === "income" ? "+" : "-"}${formatCurrency(item.amount, currency)}`}
+              name={item.description}
+              category={summary?.name ?? ""}
+              date={item.date}
+              amount={`${item.type === "income" ? "+" : "-"}${fmt(item.amount)}`}
               isIncome={item.type === "income"}
+              color={colorFor(summary?.name ?? "")}
               onDelete={() => onDelete(item.id)}
             />
           )}
         />
       )}
-      <Sheet visible={showNew} onClose={closeNew} title="New transaction">
-        <Field value={desc} onChange={setDesc} placeholder="Description" />
-        <Field value={amount} onChange={setAmount} placeholder="Amount" numeric />
-        <View style={s.bar}>
-          <Btn title="Expense" variant={type === "expense" ? "primary" : "outline"} onPress={toExpense} />
-          <Btn title="Income" variant={type === "income" ? "primary" : "outline"} onPress={toIncome} />
-        </View>
-        <Btn title="Add" onPress={onCreate} />
-      </Sheet>
+      <FAB onPress={openNew} label="Add transaction" />
+      <AddTxnSheet
+        visible={showNew}
+        onClose={closeNew}
+        categories={summary ? [{ id: summary.id, name: summary.name }] : []}
+        initialCategoryId={cid}
+        onSaved={onSaved}
+      />
+      <Toast message={toast} />
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: C.bg, padding: 12, gap: 10 },
-  title: { fontSize: 18, fontWeight: "700", marginBottom: 8 },
-  stats: { flexDirection: "row", gap: 8, marginBottom: 6 },
-  sub: { fontSize: 12, color: C.sub },
+  wrap: { flex: 1, padding: 20, gap: 12 },
+  h1: { fontSize: 28, fontWeight: "800" },
+  stats: { flexDirection: "row", gap: 12, marginBottom: 6 },
+  sub: { fontSize: 12 },
   bar: { flexDirection: "row", gap: 8 },
-  list: { gap: 8, paddingBottom: 24 },
+  list: { gap: 8, paddingBottom: 110 },
 });

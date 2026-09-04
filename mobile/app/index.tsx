@@ -1,133 +1,43 @@
-import { useCallback, useEffect, useState } from "react";
-import { Alert, FlatList, StyleSheet, View } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
-import {
-  createYear,
-  dashboardSummary,
-  deleteYear,
-  getCurrency,
-  listYears,
-} from "../src/db";
-import { formatCurrency } from "../src/format";
-import type { DashboardSummary, Year } from "../src/types";
-import { Btn, C, CenterLoad, Empty, Field, ROW_H, Sheet, Stat, YearRow } from "../src/ui";
+import { useEffect } from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { getSetting } from "../src/db";
+import { useTheme } from "../src/theme";
 
-export default function Dashboard() {
+export default function Splash() {
   const router = useRouter();
-  const [years, setYears] = useState<Year[]>([]);
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [currency, setCurrencyState] = useState("$");
-  const [loading, setLoading] = useState(true);
-  const [showNew, setShowNew] = useState(false);
-  const [name, setName] = useState("");
-
-  const load = useCallback(async () => {
-    try {
-      const [ys, sum, cur] = await Promise.all([
-        listYears(),
-        dashboardSummary(),
-        getCurrency(),
-      ]);
-      setYears(ys);
-      setSummary(sum);
-      setCurrencyState(cur);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const t = useTheme();
 
   useEffect(() => {
-    load();
-  }, [load]);
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load])
-  );
-
-  const onCreate = useCallback(async () => {
-    if (!name.trim()) return;
-    try {
-      await createYear(name);
-      setName("");
-      setShowNew(false);
-      load();
-    } catch (e) {
-      Alert.alert("Error", (e as Error).message);
-    }
-  }, [name, load]);
-
-  const onDelete = useCallback(
-    (id: number) => {
-      Alert.alert("Delete year?", "Months inside will be deleted.", [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deleteYear(id).then(load),
-        },
-      ]);
-    },
-    [load]
-  );
-
-  const openSheet = useCallback(() => setShowNew(true), []);
-  const closeSheet = useCallback(() => setShowNew(false), []);
-  const onName = useCallback((v: string) => setName(v), []);
-
-  if (loading) return <CenterLoad />;
-  if (years.length === 0)
-    return (
-      <View style={s.wrap}>
-        <Empty title="No years yet" hint="Create your first year to start tracking." actionTitle="Create year" onAction={openSheet} />
-        <Sheet visible={showNew} onClose={closeSheet} title="New year">
-          <Field value={name} onChange={onName} placeholder="e.g. 2026" />
-          <Btn title="Create" onPress={onCreate} />
-        </Sheet>
-      </View>
-    );
+    let live = true;
+    (async () => {
+      const [ob, prof] = await Promise.all([getSetting("onboarded"), getSetting("profile")]);
+      await new Promise((r) => setTimeout(r, 900));
+      if (!live) return;
+      if (ob !== "1") router.replace("/onboarding");
+      else if (!prof) router.replace("/login");
+      else router.replace("/(tabs)");
+    })();
+    return () => {
+      live = false;
+    };
+  }, [router]);
 
   return (
-    <View style={s.wrap}>
-      <View style={s.stats}>
-        <Stat label="Years" value={String(summary?.year_count ?? 0)} />
-        <Stat label="Months" value={String(summary?.month_count ?? 0)} />
+    <View style={[s.wrap, { backgroundColor: t.bg }]}>
+      <View style={[s.logo, { backgroundColor: t.primary }]}>
+        <Text style={s.glyph}>₣</Text>
       </View>
-      <View style={s.stats}>
-        <Stat label="Txns" value={String(summary?.total_transactions ?? 0)} />
-        <Stat label="Avg/mo" value={formatCurrency(summary?.avg_monthly_spending ?? 0, currency)} />
-      </View>
-      <View style={s.bar}>
-        <Btn title="+ Year" onPress={openSheet} />
-        <Btn title="Settings" variant="outline" onPress={() => router.push("/settings")} />
-      </View>
-      <FlatList
-        data={years}
-        keyExtractor={(y) => String(y.id)}
-        getItemLayout={(_, i) => ({ length: ROW_H, offset: ROW_H * i, index: i })}
-        windowSize={7}
-        maxToRenderPerBatch={20}
-        removeClippedSubviews
-        contentContainerStyle={s.list}
-        renderItem={({ item }) => (
-          <YearRow
-            name={item.name}
-            onPress={() => router.push({ pathname: "/years/[yearId]", params: { yearId: String(item.id) } })}
-            onDelete={() => onDelete(item.id)}
-          />
-        )}
-      />
-      <Sheet visible={showNew} onClose={closeSheet} title="New year">
-        <Field value={name} onChange={onName} placeholder="e.g. 2026" />
-        <Btn title="Create" onPress={onCreate} />
-      </Sheet>
+      <Text style={[s.name, { color: t.text }]}>FinTrack</Text>
+      <Text style={[s.tag, { color: t.sub }]}>Track every rupee, dollar & dime</Text>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: C.bg, padding: 12, gap: 10 },
-  stats: { flexDirection: "row", gap: 10 },
-  bar: { flexDirection: "row", gap: 8 },
-  list: { gap: 8, paddingBottom: 24 },
+  wrap: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8 },
+  logo: { width: 96, height: 96, borderRadius: 28, alignItems: "center", justifyContent: "center" },
+  glyph: { color: "#fff", fontSize: 52, fontWeight: "800" },
+  name: { fontSize: 28, fontWeight: "800" },
+  tag: { fontSize: 15 },
 });

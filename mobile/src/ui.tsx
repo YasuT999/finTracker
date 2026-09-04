@@ -1,6 +1,7 @@
-// Stateless presentational components only.
-// Rules: props in, UI out. No useState/useEffect inside. All memo'd.
-// State lives in screens via src/hooks.ts; data lives in src/db.ts.
+// Stateless presentational library (Figma spec §4).
+// Rules: props in, UI out. No useState/useEffect inside.
+// Exception: useTheme() context reads are allowed (theme flips rarely,
+// never per-frame). State lives in screens, data in src/db.ts.
 import { memo, type ReactNode } from "react";
 import {
   ActivityIndicator,
@@ -11,72 +12,344 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { CHART_COLORS, R, useTheme } from "./theme";
 
-export const ROW_H = 68;
-export const TXN_H = 64;
+export const ROW_H = 72;
+export const TXN_H = 72;
+export const MONTH_CARD_H = 96;
 
-export const C = {
-  bg: "#f8fafc",
-  card: "#ffffff",
-  ink: "#0f172a",
-  sub: "#64748b",
-  line: "#e2e8f0",
-  accent: "#2563eb",
-  danger: "#dc2626",
-  ok: "#16a34a",
-};
+// ---------- buttons ----------
 
 export const Btn = memo(function Btn(props: {
   title: string;
   onPress: () => void;
-  variant?: "primary" | "outline" | "danger";
+  variant?: "primary" | "ghost" | "danger";
+  size?: "sm" | "md";
+  block?: boolean;
 }) {
+  const t = useTheme();
   const v = props.variant ?? "primary";
+  const sm = props.size === "sm";
   return (
     <Pressable
       onPress={props.onPress}
-      style={[s.btn, v === "outline" && s.btnOutline, v === "danger" && s.btnDanger]}
+      style={[
+        s.btn,
+        { backgroundColor: v === "primary" ? t.primary : "transparent" },
+        v === "ghost" && { borderWidth: 1, borderColor: t.border },
+        v === "danger" && { backgroundColor: t.danger },
+        sm ? s.btnSm : s.btnMd,
+        props.block && s.block,
+      ]}
     >
-      <Text style={[s.btnText, v === "outline" && s.btnTextOutline]}>{props.title}</Text>
+      <Text
+        style={[
+          s.btnText,
+          sm && s.btnTextSm,
+          { color: v === "primary" || v === "danger" ? "#FFFFFF" : t.text },
+        ]}
+      >
+        {props.title}
+      </Text>
     </Pressable>
   );
 });
 
+export const FAB = memo(function FAB(props: { onPress: () => void; label: string }) {
+  const t = useTheme();
+  return (
+    <Pressable
+      onPress={props.onPress}
+      style={[s.fab, { backgroundColor: t.primary }]}
+      accessibilityLabel={props.label}
+    >
+      <Text style={s.fabText}>+</Text>
+    </Pressable>
+  );
+});
+
+// ---------- cards / stats ----------
+
 export const Card = memo(function Card(props: { children: ReactNode }) {
-  return <View style={s.card}>{props.children}</View>;
+  const t = useTheme();
+  return <View style={[s.card, { backgroundColor: t.card, borderColor: t.border }]}>{props.children}</View>;
 });
 
 export const Stat = memo(function Stat(props: { label: string; value: string }) {
+  const t = useTheme();
   return (
-    <View style={s.stat}>
-      <Text style={s.statVal} numberOfLines={1}>
+    <View style={s.statGrow}>
+      <Text style={[s.statVal, { color: t.text }]} numberOfLines={1}>
         {props.value}
       </Text>
-      <Text style={s.statLabel}>{props.label}</Text>
+      <Text style={[s.caption, { color: t.sub }]}>{props.label}</Text>
     </View>
   );
 });
 
-// View-based bar (replaces recharts — zero dep, zero list cost)
+// ---------- progress + charts (View-based, zero deps) ----------
+
 export const Bar = memo(function Bar(props: { value: number }) {
+  const t = useTheme();
   const w = Math.max(0, Math.min(100, props.value));
   return (
-    <View style={s.barTrack}>
-      <View style={[s.barFill, { width: `${w}%` }]} />
+    <View style={[s.barTrack, { backgroundColor: t.border }]}>
+      <View style={[s.barFill, { width: `${w}%`, backgroundColor: t.primary }]} />
     </View>
   );
 });
 
-export const Empty = memo(function Empty(props: {
+export const BarChart = memo(function BarChart(props: {
+  data: { label: string; value: number; color?: string }[];
+  height?: number;
+}) {
+  const t = useTheme();
+  const h = props.height ?? 140;
+  const max = Math.max(1, ...props.data.map((d) => d.value));
+  return (
+    <View style={[s.chartRow, { height: h }]}>
+      {props.data.map((d, i) => (
+        <View key={i} style={s.chartCol}>
+          <View style={[s.chartBarWrap, { height: h - 24 }]}>
+            <View
+              style={{
+                width: 14,
+                borderRadius: 7,
+                height: Math.max(4, (d.value / max) * (h - 24)),
+                backgroundColor: d.color ?? t.primary,
+              }}
+            />
+          </View>
+          <Text style={[s.caption, { color: t.sub }]} numberOfLines={1}>
+            {d.label}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+});
+
+export const MiniBars = memo(function MiniBars(props: { values: number[]; height?: number }) {
+  const t = useTheme();
+  const h = props.height ?? 72;
+  const max = Math.max(1, ...props.values.map((v) => Math.abs(v)));
+  return (
+    <View style={[s.miniRow, { height: h }]}>
+      {props.values.map((v, i) => (
+        <View
+          key={i}
+          style={{
+            flex: 1,
+            borderRadius: 3,
+            height: Math.max(3, (Math.abs(v) / max) * h),
+            backgroundColor: v >= 0 ? t.success : t.danger,
+            opacity: v === 0 ? 0.25 : 1,
+          }}
+        />
+      ))}
+    </View>
+  );
+});
+
+// Donut = proportional tick ring (72 ticks, no deps) + center label + legend.
+const TICKS = 72;
+export const DonutChart = memo(function DonutChart(props: {
+  data: { name: string; amount: number }[];
+  size?: number;
+  centerLabel: string;
+  format: (n: number) => string;
+}) {
+  const t = useTheme();
+  const D = props.size ?? 168;
+  const RING = 22;
+  const r = D / 2 - RING / 2;
+  const total = props.data.reduce((s, d) => s + d.amount, 0);
+  const bounds: { upTo: number; color: string }[] = [];
+  let acc = 0;
+  props.data.forEach((d, i) => {
+    acc += total > 0 ? d.amount / total : 0;
+    bounds.push({ upTo: acc, color: CHART_COLORS[i % CHART_COLORS.length] });
+  });
+  const colorAt = (f: number) => bounds.find((b) => f <= b.upTo)?.color ?? t.border;
+  const ticks = Array.from({ length: TICKS }, (_, k) => {
+    const deg = (k / TICKS) * 360;
+    return { deg, color: colorAt((k + 0.5) / TICKS) };
+  });
+  return (
+    <View>
+      <View style={{ width: D, height: D, alignSelf: "center" }}>
+        {ticks.map((tk, k) => (
+          <View
+            key={k}
+            style={{
+              position: "absolute",
+              left: D / 2 - RING / 2,
+              top: D / 2 - 9,
+              width: RING,
+              height: 18,
+              borderRadius: 9,
+              backgroundColor: tk.color,
+              transform: [{ rotate: `${tk.deg}deg` }, { translateY: -r }],
+            }}
+          />
+        ))}
+        <View style={s.donutCenter}>
+          <Text style={[s.donutVal, { color: t.text }]} numberOfLines={1}>
+            {props.centerLabel}
+          </Text>
+        </View>
+      </View>
+      <View style={s.legend}>
+        {props.data.map((d, i) => (
+          <View key={i} style={s.legendRow}>
+            <View style={[s.dot, { backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }]} />
+            <Text style={[s.body, { color: t.text }]} numberOfLines={1}>
+              {d.name}
+            </Text>
+            <Text style={[s.body, { color: t.sub }]}>{props.format(d.amount)}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+});
+
+// ---------- inputs ----------
+
+export const Field = memo(function Field(props: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  numeric?: boolean;
+  large?: boolean;
+  error?: string;
+}) {
+  const t = useTheme();
+  return (
+    <View>
+      <TextInput
+        value={props.value}
+        onChangeText={props.onChange}
+        placeholder={props.placeholder}
+        keyboardType={props.numeric ? "numeric" : "default"}
+        placeholderTextColor={t.sub}
+        style={[
+          s.field,
+          props.large && s.fieldLarge,
+          {
+            backgroundColor: t.bg,
+            borderColor: props.error ? t.danger : t.border,
+            color: t.text,
+          },
+        ]}
+      />
+      {props.error ? <Text style={[s.err, { color: t.danger }]}>{props.error}</Text> : null}
+    </View>
+  );
+});
+
+// ---------- chips / segmented ----------
+
+export const Chip = memo(function Chip(props: {
+  label: string;
+  selected?: boolean;
+  onPress: () => void;
+  dot?: string;
+}) {
+  const t = useTheme();
+  const sel = props.selected ?? false;
+  return (
+    <Pressable
+      onPress={props.onPress}
+      style={[
+        s.chip,
+        {
+          backgroundColor: sel ? t.primary : "transparent",
+          borderColor: sel ? t.primary : t.border,
+        },
+      ]}
+    >
+      {props.dot ? <View style={[s.dot, { backgroundColor: props.dot }]} /> : null}
+      <Text style={[s.chipText, { color: sel ? "#FFFFFF" : t.text }]}>{props.label}</Text>
+    </Pressable>
+  );
+});
+
+export const Segmented = memo(function Segmented(props: {
+  options: string[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const t = useTheme();
+  return (
+    <View style={[s.seg, { backgroundColor: t.bg, borderColor: t.border }]}>
+      {props.options.map((o) => {
+        const sel = o === props.value;
+        return (
+          <Pressable
+            key={o}
+            onPress={() => props.onChange(o)}
+            style={[s.segOpt, sel && { backgroundColor: t.primary }]}
+          >
+            <Text style={[s.chipText, { color: sel ? "#FFFFFF" : t.sub }]}>{o}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+});
+
+// ---------- sheet / toast / states ----------
+
+export const Sheet = memo(function Sheet(props: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  children: ReactNode;
+}) {
+  const t = useTheme();
+  return (
+    <Modal visible={props.visible} transparent animationType="slide" onRequestClose={props.onClose}>
+      <Pressable style={s.sheetBg} onPress={props.onClose}>
+        <Pressable
+          onPress={() => {}}
+          style={[s.sheet, { backgroundColor: t.card, borderColor: t.border }]}
+        >
+          <View style={[s.grab, { backgroundColor: t.border }]} />
+          <Text style={[s.h2, { color: t.text }]}>{props.title}</Text>
+          {props.children}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+});
+
+export const Toast = memo(function Toast(props: { message: string | null }) {
+  const t = useTheme();
+  if (!props.message) return null;
+  return (
+    <View style={s.toastWrap} pointerEvents="none">
+      <View style={[s.toast, { backgroundColor: t.success }]}>
+        <Text style={s.toastText}>{props.message}</Text>
+      </View>
+    </View>
+  );
+});
+
+export const EmptyState = memo(function EmptyState(props: {
   title: string;
   hint: string;
   actionTitle?: string;
   onAction?: () => void;
 }) {
+  const t = useTheme();
   return (
     <View style={s.empty}>
-      <Text style={s.emptyTitle}>{props.title}</Text>
-      <Text style={s.hint}>{props.hint}</Text>
+      <View style={[s.emptyArt, { backgroundColor: t.card, borderColor: t.border }]}>
+        <Text style={[s.emptyGlyph, { color: t.primary }]}>+</Text>
+      </View>
+      <Text style={[s.h2, { color: t.text }]}>{props.title}</Text>
+      <Text style={[s.body, { color: t.sub, textAlign: "center" }]}>{props.hint}</Text>
       {props.actionTitle && props.onAction ? (
         <Btn title={props.actionTitle} onPress={props.onAction} />
       ) : null}
@@ -85,160 +358,201 @@ export const Empty = memo(function Empty(props: {
 });
 
 export const CenterLoad = memo(function CenterLoad() {
+  const t = useTheme();
   return (
-    <View style={s.center}>
-      <ActivityIndicator />
+    <View style={[s.center, { backgroundColor: t.bg }]}>
+      <ActivityIndicator color={t.primary} />
     </View>
   );
 });
 
-export const Field = memo(function Field(props: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder: string;
-  numeric?: boolean;
-}) {
-  return (
-    <TextInput
-      value={props.value}
-      onChangeText={props.onChange}
-      placeholder={props.placeholder}
-      keyboardType={props.numeric ? "numeric" : "default"}
-      style={s.field}
-      placeholderTextColor={C.sub}
-    />
-  );
-});
+// ---------- cards / rows ----------
 
-export const Sheet = memo(function Sheet(props: {
-  visible: boolean;
-  onClose: () => void;
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <Modal visible={props.visible} transparent animationType="fade" onRequestClose={props.onClose}>
-      <View style={s.sheetBg}>
-        <View style={s.sheet}>
-          <Text style={s.sheetTitle}>{props.title}</Text>
-          {props.children}
-        </View>
-      </View>
-    </Modal>
-  );
-});
-
-// ---- rows (fixed height → getItemLayout, memo → no re-render storms) ----
-
-export const YearRow = memo(function YearRow(props: {
+export const YearCard = memo(function YearCard(props: {
   name: string;
+  meta: string;
   onPress: () => void;
   onDelete: () => void;
 }) {
+  const t = useTheme();
   return (
-    <View style={s.row}>
+    <View style={[s.rowCard, { backgroundColor: t.card, borderColor: t.border }]}>
       <Pressable onPress={props.onPress} style={s.rowGrow} hitSlop={8}>
-        <Text style={s.rowTitle}>{props.name}</Text>
+        <Text style={[s.yearTitle, { color: t.text }]}>{props.name}</Text>
+        <Text style={[s.body, { color: t.sub }]}>{props.meta}</Text>
       </Pressable>
+      <Text style={[s.chev, { color: t.sub }]}>›</Text>
       <Pressable onPress={props.onDelete} hitSlop={12}>
-        <Text style={s.del}>Delete</Text>
+        <Text style={[s.del, { color: t.danger }]}>Delete</Text>
       </Pressable>
     </View>
   );
 });
 
-export const MonthRow = memo(function MonthRow(props: {
+export const MonthCard = memo(function MonthCard(props: {
   name: string;
-  budget: string;
+  net: string;
+  positive: boolean;
   onPress: () => void;
   onDelete: () => void;
 }) {
+  const t = useTheme();
   return (
-    <View style={s.row}>
+    <View style={[s.monthCard, { backgroundColor: t.card, borderColor: t.border }]}>
       <Pressable onPress={props.onPress} style={s.rowGrow} hitSlop={8}>
-        <Text style={s.rowTitle}>{props.name}</Text>
-        <Text style={s.sub}>{props.budget}</Text>
+        <Text style={[s.rowTitle, { color: t.text }]} numberOfLines={1}>
+          {props.name}
+        </Text>
+        <Text style={[s.amount, { color: props.positive ? t.success : t.danger }]}>{props.net}</Text>
       </Pressable>
       <Pressable onPress={props.onDelete} hitSlop={12}>
-        <Text style={s.del}>Delete</Text>
+        <Text style={[s.delSm, { color: t.danger }]}>✕</Text>
       </Pressable>
     </View>
   );
 });
 
-export const GroupRow = memo(function GroupRow(props: {
+export const GroupCard = memo(function GroupCard(props: {
   name: string;
   meta: string;
   utilization: number;
+  color: string;
   onPress: () => void;
   onDelete: () => void;
 }) {
+  const t = useTheme();
   return (
-    <View style={s.rowTall}>
+    <View style={[s.rowCard, { backgroundColor: t.card, borderColor: t.border }]}>
+      <View style={[s.dotLg, { backgroundColor: props.color }]} />
       <Pressable onPress={props.onPress} style={s.rowGrow} hitSlop={8}>
-        <Text style={s.rowTitle}>{props.name}</Text>
-        <Text style={s.sub}>{props.meta}</Text>
+        <Text style={[s.rowTitle, { color: t.text }]}>{props.name}</Text>
+        <Text style={[s.caption, { color: t.sub }]}>{props.meta}</Text>
         <Bar value={props.utilization} />
       </Pressable>
       <Pressable onPress={props.onDelete} hitSlop={12}>
-        <Text style={s.del}>Delete</Text>
+        <Text style={[s.del, { color: t.danger }]}>Delete</Text>
       </Pressable>
     </View>
   );
 });
 
-export const CategoryRow = memo(GroupRow);
-
 export const TxnRow = memo(function TxnRow(props: {
-  description: string;
-  meta: string;
+  name: string;
+  category: string;
+  date: string;
   amount: string;
   isIncome: boolean;
+  color: string;
   onDelete: () => void;
 }) {
+  const t = useTheme();
   return (
-    <View style={s.row}>
-      <View style={s.rowGrow}>
-        <Text style={s.rowTitle} numberOfLines={1}>
-          {props.description}
-        </Text>
-        <Text style={s.sub}>{props.meta}</Text>
+    <View style={[s.txn, { backgroundColor: t.card, borderColor: t.border }]}>
+      <View style={[s.avatar, { backgroundColor: props.color }]}>
+        <Text style={s.avatarText}>{props.name.slice(0, 1).toUpperCase()}</Text>
       </View>
-      <Text style={[s.amt, props.isIncome ? s.ok : s.bad]}>{props.amount}</Text>
+      <View style={s.rowGrow}>
+        <Text style={[s.rowTitle, { color: t.text }]} numberOfLines={1}>
+          {props.name}
+        </Text>
+        <Text style={[s.caption, { color: t.sub }]}>
+          {props.category} · {props.date}
+        </Text>
+      </View>
+      <Text style={[s.amount, { color: props.isIncome ? t.success : t.danger }]}>{props.amount}</Text>
       <Pressable onPress={props.onDelete} hitSlop={12}>
-        <Text style={s.del}>✕</Text>
+        <Text style={[s.del, { color: t.danger }]}>✕</Text>
       </Pressable>
     </View>
   );
 });
 
 const s = StyleSheet.create({
-  btn: { backgroundColor: C.accent, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, alignItems: "center" },
-  btnOutline: { backgroundColor: "transparent", borderWidth: 1, borderColor: C.line },
-  btnDanger: { backgroundColor: C.danger },
-  btnText: { color: "#fff", fontWeight: "600" },
-  btnTextOutline: { color: C.ink },
-  card: { backgroundColor: C.card, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: C.line },
-  stat: { flex: 1, minWidth: 100, backgroundColor: C.card, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: C.line },
-  statVal: { fontSize: 16, fontWeight: "700", color: C.ink },
-  statLabel: { fontSize: 11, color: C.sub, textTransform: "uppercase", marginTop: 2 },
-  barTrack: { height: 6, backgroundColor: C.line, borderRadius: 3, marginTop: 6, overflow: "hidden" },
-  barFill: { height: 6, backgroundColor: C.accent, borderRadius: 3 },
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 8 },
-  emptyTitle: { fontSize: 18, fontWeight: "700", color: C.ink },
-  hint: { color: C.sub, textAlign: "center", marginBottom: 8 },
+  btn: { borderRadius: R.btn, alignItems: "center", justifyContent: "center" },
+  btnMd: { paddingVertical: 12, paddingHorizontal: 16 },
+  btnSm: { paddingVertical: 8, paddingHorizontal: 12 },
+  block: { width: "100%" },
+  btnText: { fontSize: 15, fontWeight: "700" },
+  btnTextSm: { fontSize: 13 },
+  fab: {
+    position: "absolute",
+    right: 20,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 4,
+  },
+  fabText: { color: "#fff", fontSize: 28, fontWeight: "400", marginTop: -2 },
+  card: { borderRadius: R.card, padding: 16, borderWidth: 1 },
+  statGrow: { flex: 1 },
+  statVal: { fontSize: 22, fontWeight: "800" },
+  caption: { fontSize: 12, fontWeight: "500", marginTop: 2 },
+  body: { fontSize: 15 },
+  h2: { fontSize: 20, fontWeight: "700", marginBottom: 8 },
+  yearTitle: { fontSize: 22, fontWeight: "800" },
+  rowTitle: { fontSize: 15, fontWeight: "600" },
+  amount: { fontSize: 15, fontWeight: "800", marginTop: 4 },
+  chev: { fontSize: 24, fontWeight: "300", marginHorizontal: 4 },
+  del: { fontSize: 13, marginLeft: 8 },
+  delSm: { fontSize: 13, marginLeft: 4 },
+  barTrack: { height: 6, borderRadius: 3, marginTop: 8, overflow: "hidden" },
+  barFill: { height: 6, borderRadius: 3 },
+  chartRow: { flexDirection: "row", alignItems: "flex-end", gap: 4 },
+  chartCol: { flex: 1, alignItems: "center", gap: 4 },
+  chartBarWrap: { justifyContent: "flex-end" },
+  miniRow: { flexDirection: "row", alignItems: "flex-end", gap: 4 },
+  donutCenter: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center" },
+  donutVal: { fontSize: 20, fontWeight: "800" },
+  legend: { gap: 8, marginTop: 12 },
+  legendRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  dotLg: { width: 12, height: 12, borderRadius: 6, marginRight: 4 },
+  field: { borderWidth: 1, borderRadius: R.input, padding: 12, fontSize: 15, marginBottom: 4 },
+  fieldLarge: { fontSize: 28, fontWeight: "800", textAlign: "center", padding: 16 },
+  err: { fontSize: 12, marginBottom: 8 },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: R.tag,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  chipText: { fontSize: 13, fontWeight: "600" },
+  seg: { flexDirection: "row", borderWidth: 1, borderRadius: R.btn, padding: 4, gap: 4 },
+  segOpt: { flex: 1, borderRadius: 8, paddingVertical: 10, alignItems: "center" },
+  sheetBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  sheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    padding: 20,
+    paddingBottom: 32,
+    gap: 6,
+  },
+  grab: { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 8 },
+  toastWrap: { position: "absolute", left: 0, right: 0, bottom: 100, alignItems: "center" },
+  toast: { borderRadius: R.tag, paddingVertical: 10, paddingHorizontal: 18 },
+  toastText: { color: "#fff", fontWeight: "700" },
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 8 },
+  emptyArt: { width: 96, height: 96, borderRadius: 48, borderWidth: 1, alignItems: "center", justifyContent: "center", marginBottom: 8 },
+  emptyGlyph: { fontSize: 44, fontWeight: "300" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  field: { borderWidth: 1, borderColor: C.line, borderRadius: 8, padding: 10, backgroundColor: "#fff", color: C.ink, marginBottom: 8 },
-  sheetBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", padding: 20 },
-  sheet: { backgroundColor: "#fff", borderRadius: 12, padding: 16, gap: 4 },
-  sheetTitle: { fontSize: 16, fontWeight: "700", marginBottom: 8, color: C.ink },
-  row: { height: ROW_H, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: C.card, borderRadius: 10, paddingHorizontal: 12, borderWidth: 1, borderColor: C.line },
-  rowTall: { minHeight: ROW_H, flexDirection: "row", alignItems: "center", backgroundColor: C.card, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: C.line, gap: 8 },
+  rowCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: R.card,
+    padding: 14,
+    borderWidth: 1,
+  },
+  monthCard: { flex: 1, borderRadius: R.card, padding: 12, borderWidth: 1, minHeight: 96 },
+  txn: { flexDirection: "row", alignItems: "center", borderRadius: R.card, padding: 12, borderWidth: 1, gap: 10 },
   rowGrow: { flex: 1 },
-  rowTitle: { fontSize: 15, fontWeight: "600", color: C.ink },
-  sub: { fontSize: 12, color: C.sub, marginTop: 2 },
-  del: { color: C.danger, fontSize: 13, marginLeft: 12 },
-  amt: { fontWeight: "700", marginLeft: 8 },
-  ok: { color: C.ok },
-  bad: { color: C.ink },
+  avatar: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  avatarText: { color: "#fff", fontWeight: "800", fontSize: 16 },
 });

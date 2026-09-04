@@ -1,33 +1,73 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { createGroup, deleteGroup, getCurrency, getMonthSummary, listGroups } from "../../src/db";
-import { formatCurrency } from "../../src/format";
+import {
+  createGroup,
+  deleteGroup,
+  deleteTransaction,
+  getCurrency,
+  getMonthSummary,
+  listGroups,
+  recentMonthTxns,
+  spendByGroup,
+  type GroupTxn,
+} from "../../src/db";
 import type { GroupWithUtilization, MonthSummary } from "../../src/types";
-import { Btn, C, Card, CenterLoad, Empty, Field, GroupRow, Sheet, Stat } from "../../src/ui";
+import { formatCurrency } from "../../src/format";
+import { CHART_COLORS, useTheme } from "../../src/theme";
+import {
+  BarChart,
+  Btn,
+  Card,
+  CenterLoad,
+  Chip,
+  DonutChart,
+  EmptyState,
+  FAB,
+  Field,
+  GroupCard,
+  Sheet,
+  Stat,
+  Toast,
+  TxnRow,
+} from "../../src/ui";
 
-export default function MonthGroups() {
+function colorFor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return CHART_COLORS[h % CHART_COLORS.length];
+}
+
+export default function MonthDashboard() {
   const { monthId } = useLocalSearchParams<{ monthId: string }>();
   const mid = Number(monthId);
   const router = useRouter();
+  const t = useTheme();
   const [summary, setSummary] = useState<MonthSummary | null>(null);
   const [groups, setGroups] = useState<GroupWithUtilization[]>([]);
+  const [recent, setRecent] = useState<GroupTxn[]>([]);
+  const [byGroup, setByGroup] = useState<{ name: string; amount: number }[]>([]);
   const [currency, setCurrencyState] = useState("$");
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [name, setName] = useState("");
   const [budget, setBudget] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [sum, gs, cur] = await Promise.all([
+      const [sum, gs, cur, rec, bg] = await Promise.all([
         getMonthSummary(mid),
         listGroups(mid),
         getCurrency(),
+        recentMonthTxns(mid, 3),
+        spendByGroup(mid),
       ]);
       setSummary(sum);
       setGroups(gs);
+      setRecent(rec);
+      setByGroup(bg.filter((g) => g.amount > 0).slice(0, 6));
       setCurrencyState(cur);
     } finally {
       setLoading(false);
@@ -43,6 +83,12 @@ export default function MonthGroups() {
     }, [load])
   );
 
+  const fmt = useCallback((n: number) => formatCurrency(n, currency), [currency]);
+  const say = useCallback((m: string) => {
+    setToast(m);
+    setTimeout(() => setToast(null), 1800);
+  }, []);
+
   const onCreate = useCallback(async () => {
     if (!name.trim()) return;
     await createGroup(mid, name, Number(budget) || 0);
@@ -50,7 +96,8 @@ export default function MonthGroups() {
     setBudget("");
     setShowNew(false);
     load();
-  }, [mid, name, budget, load]);
+    say("Saved ✓");
+  }, [mid, name, budget, load, say]);
 
   const onDelete = useCallback(
     (id: number) => {
@@ -62,54 +109,125 @@ export default function MonthGroups() {
     [load]
   );
 
+  const onDeleteTxn = useCallback(
+    (id: number) => {
+      Alert.alert("Delete transaction?", undefined, [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: () => deleteTransaction(id).then(load) },
+      ]);
+    },
+    [load]
+  );
+
+  const openGroup = useCallback(
+    (id: number) => router.push({ pathname: "/groups/[groupId]", params: { groupId: String(id) } }),
+    [router]
+  );
+
   if (loading) return <CenterLoad />;
   return (
-    <View style={s.wrap}>
-      <Card>
-        <Text style={s.title}>{summary?.name ?? ""}</Text>
-        <View style={s.stats}>
-          <Stat label="Budget" value={formatCurrency(summary?.total_budget ?? 0, currency)} />
-          <Stat label="Spent" value={formatCurrency(summary?.total_expenses ?? 0, currency)} />
-        </View>
-        <View style={s.stats}>
-          <Stat label="Left" value={formatCurrency(summary?.remaining_budget ?? 0, currency)} />
-          <Stat label="Used" value={`${summary?.utilization_percentage ?? 0}%`} />
-        </View>
-      </Card>
-      <Btn title="+ Group" onPress={() => setShowNew(true)} />
-      {groups.length === 0 ? (
-        <Empty title="No groups" hint="Add your first budget group." />
-      ) : (
+    <View style={[s.wrap, { backgroundColor: t.bg }]}>
+      <ScrollView contentContainerStyle={s.body}>
+        <Text style={[s.h1, { color: t.text }]}>{summary?.name ?? ""}</Text>
+        <Card>
+          <Text style={[s.cap, { color: t.sub }]}>Remaining</Text>
+          <Text style={[s.hero, { color: t.text }]}>{fmt(summary?.remaining_budget ?? 0)}</Text>
+          <View style={s.stats}>
+            <Stat label="Income" value={fmt(summary?.total_income ?? 0)} />
+            <Stat label="Spent" value={fmt(summary?.total_expenses ?? 0)} />
+          </View>
+        </Card>
+        <Card>
+          <Text style={[s.h2, { color: t.text }]}>Income vs spent</Text>
+          <BarChart
+            data={[
+              { label: "Income", value: summary?.total_income ?? 0, color: t.success },
+              { label: "Spent", value: summary?.total_expenses ?? 0, color: t.danger },
+            ]}
+            height={120}
+          />
+        </Card>
+        {byGroup.length > 0 ? (
+          <Card>
+            <Text style={[s.h2, { color: t.text }]}>Spend by group</Text>
+            <DonutChart
+              data={byGroup}
+              centerLabel={fmt(byGroup.reduce((s2, g) => s2 + g.amount, 0))}
+              format={fmt}
+            />
+          </Card>
+        ) : null}
+        <Text style={[s.h2, { color: t.text }]}>Groups</Text>
         <FlatList
+          horizontal
           data={groups}
           keyExtractor={(g) => String(g.id)}
-          windowSize={7}
-          maxToRenderPerBatch={20}
-          removeClippedSubviews
-          contentContainerStyle={s.list}
-          renderItem={({ item }) => (
-            <GroupRow
-              name={item.name}
-              meta={`${formatCurrency(item.actual_spending, currency)} of ${formatCurrency(item.allocated_budget, currency)}`}
-              utilization={item.utilization_percentage}
-              onPress={() => router.push({ pathname: "/groups/[groupId]", params: { groupId: String(item.id) } })}
-              onDelete={() => onDelete(item.id)}
+          contentContainerStyle={s.chips}
+          showsHorizontalScrollIndicator={false}
+          renderItem={({ item, index }) => (
+            <Chip
+              label={item.name}
+              dot={CHART_COLORS[index % CHART_COLORS.length]}
+              onPress={() => openGroup(item.id)}
             />
           )}
         />
-      )}
-      <Sheet visible={showNew} onClose={() => setShowNew(false)} title="New group">
+        {groups.length === 0 ? (
+          <EmptyState title="No groups" hint="Add your first budget group." />
+        ) : (
+          <View style={s.gap}>
+            {groups.map((g, i) => (
+              <GroupCard
+                key={g.id}
+                name={g.name}
+                meta={`${fmt(g.actual_spending)} of ${fmt(g.allocated_budget)}`}
+                utilization={g.utilization_percentage}
+                color={CHART_COLORS[i % CHART_COLORS.length]}
+                onPress={() => openGroup(g.id)}
+                onDelete={() => onDelete(g.id)}
+              />
+            ))}
+          </View>
+        )}
+        {recent.length > 0 ? (
+          <>
+            <Text style={[s.h2, { color: t.text }]}>Recent</Text>
+            <View style={s.gap}>
+              {recent.map((txn) => (
+                <TxnRow
+                  key={txn.id}
+                  name={txn.description}
+                  category={txn.category}
+                  date={txn.date}
+                  amount={`${txn.type === "income" ? "+" : "-"}${fmt(txn.amount)}`}
+                  isIncome={txn.type === "income"}
+                  color={colorFor(txn.category)}
+                  onDelete={() => onDeleteTxn(txn.id)}
+                />
+              ))}
+            </View>
+          </>
+        ) : null}
+      </ScrollView>
+      <FAB onPress={() => setShowNew(true)} label="Add group" />
+      <Sheet visible={showNew} onClose={() => setShowNew(false)} title="Add group">
         <Field value={name} onChange={setName} placeholder="e.g. Food" />
         <Field value={budget} onChange={setBudget} placeholder="Budget" numeric />
-        <Btn title="Create" onPress={onCreate} />
+        <Btn title="Save" onPress={onCreate} block />
       </Sheet>
+      <Toast message={toast} />
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: C.bg, padding: 12, gap: 10 },
-  title: { fontSize: 18, fontWeight: "700", marginBottom: 8 },
-  stats: { flexDirection: "row", gap: 8, marginBottom: 8 },
-  list: { gap: 8, paddingBottom: 24 },
+  wrap: { flex: 1 },
+  body: { padding: 20, gap: 12, paddingBottom: 110 },
+  h1: { fontSize: 28, fontWeight: "800" },
+  h2: { fontSize: 20, fontWeight: "700" },
+  cap: { fontSize: 12, fontWeight: "600", textTransform: "uppercase" },
+  hero: { fontSize: 28, fontWeight: "800", marginVertical: 4 },
+  stats: { flexDirection: "row", gap: 12, marginTop: 8 },
+  chips: { gap: 8 },
+  gap: { gap: 12 },
 });

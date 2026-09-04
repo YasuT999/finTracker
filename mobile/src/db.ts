@@ -187,6 +187,11 @@ export async function listGroups(monthId: number): Promise<GroupWithUtilization[
   }));
 }
 
+export async function getGroup(groupId: number): Promise<BudgetGroup | null> {
+  const d = await getDb();
+  return d.getFirstAsync<BudgetGroup>("SELECT * FROM budget_groups WHERE id = ?", [groupId]);
+}
+
 export async function createGroup(monthId: number, name: string, budget: number): Promise<number> {
   const d = await getDb();
   const r = await d.runAsync(
@@ -344,4 +349,153 @@ export async function getCurrency(): Promise<string> {
 export async function setCurrency(symbol: string): Promise<void> {
   const d = await getDb();
   await d.runAsync("INSERT OR REPLACE INTO _meta (key, value) VALUES ('currency', ?)", [symbol]);
+}
+
+// ---------- generic settings (theme, onboarding, profile) ----------
+export async function getSetting(key: string): Promise<string | null> {
+  const d = await getDb();
+  const r = await d.getFirstAsync<{ value: string }>("SELECT value FROM _meta WHERE key = ?", [key]);
+  return r?.value ?? null;
+}
+
+export async function setSetting(key: string, value: string): Promise<void> {
+  const d = await getDb();
+  await d.runAsync("INSERT OR REPLACE INTO _meta (key, value) VALUES (?, ?)", [key, value]);
+}
+
+// ---------- years with stats (months count + saved) ----------
+export interface YearStat {
+  id: number;
+  name: string;
+  months: number;
+  saved: number;
+}
+
+export async function yearStats(): Promise<YearStat[]> {
+  const d = await getDb();
+  return d.getAllAsync<YearStat>(
+    `SELECT y.id, y.name,
+      (SELECT COUNT(*) FROM months m WHERE m.year_id = y.id) AS months,
+      COALESCE((SELECT SUM(m2.total_income) FROM months m2 WHERE m2.year_id = y.id), 0) +
+      COALESCE((SELECT SUM(t.amount) FROM transactions t
+        JOIN categories c ON c.id = t.category_id
+        JOIN budget_groups g ON g.id = c.group_id
+        JOIN months m3 ON m3.id = g.month_id
+        WHERE m3.year_id = y.id AND t.type = 'income'), 0) -
+      COALESCE((SELECT SUM(t.amount) FROM transactions t
+        JOIN categories c ON c.id = t.category_id
+        JOIN budget_groups g ON g.id = c.group_id
+        JOIN months m4 ON m4.id = g.month_id
+        WHERE m4.year_id = y.id AND t.type = 'expense'), 0) AS saved
+     FROM years y ORDER BY y.name DESC`
+  );
+}
+
+// ---------- months of a year with net balance (for grid + mini chart) ----------
+export interface MonthNet extends Month {
+  spent: number;
+  income: number;
+  net: number;
+}
+
+export async function listMonthsWithNet(yearId: number): Promise<MonthNet[]> {
+  const d = await getDb();
+  const rows = await d.getAllAsync<Month & { spent: number; txn_income: number }>(
+    `SELECT m.*,
+      COALESCE((SELECT SUM(t.amount) FROM transactions t
+        JOIN categories c ON c.id = t.category_id
+        JOIN budget_groups g ON g.id = c.group_id
+        WHERE g.month_id = m.id AND t.type = 'expense'), 0) AS spent,
+      COALESCE((SELECT SUM(t.amount) FROM transactions t
+        JOIN categories c ON c.id = t.category_id
+        JOIN budget_groups g ON g.id = c.group_id
+        WHERE g.month_id = m.id AND t.type = 'income'), 0) AS txn_income
+     FROM months m WHERE m.year_id = ? ORDER BY m.id ASC`,
+    [yearId]
+  );
+  return rows.map((m) => {
+    const income = (m.total_income || 0) + (m.txn_income || 0);
+    return { ...m, spent: m.spent, income, net: income - m.spent };
+  });
+}
+
+// ---------- group-level transactions (filterable, paginated) ----------
+export interface GroupTxn extends Transaction {
+  category: string;
+}
+
+export async function listGroupTxns(
+  groupId: number,
+  type: "all" | "income" | "expense",
+  limit: number,
+  offset: number
+): Promise<GroupTxn[]> {
+  const d = await getDb();
+  const filt = type === "all" ? "" : "AND t.type = ?";
+  const params: (string | number)[] = type === "all" ? [groupId] : [groupId, type];
+  return d.getAllAsync<GroupTxn>(
+    `SELECT t.*, c.name AS category FROM transactions t
+     JOIN categories c ON c.id = t.category_id
+     WHERE c.group_id = ? ${filt}
+     ORDER BY t.date DESC, t.id DESC LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
+  );
+}
+
+export async function countGroupTxns(groupId: number, type: "all" | "income" | "expense"): Promise<number> {
+  const d = await getDb();
+  const filt = type === "all" ? "" : "AND t.type = ?";
+  const params: (string | number)[] = type === "all" ? [groupId] : [groupId, type];
+  const r = await d.getFirstAsync<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM transactions t
+     JOIN categories c ON c.id = t.category_id
+     WHERE c.group_id = ? ${filt}`,
+    params
+  );
+  return r?.n ?? 0;
+}
+
+export async function recentMonthTxns(monthId: number, limit: number): Promise<GroupTxn[]> {
+  const d = await getDb();
+  return d.getAllAsync<GroupTxn>(
+    `SELECT t.*, c.name AS category FROM transactions t
+     JOIN categories c ON c.id = t.category_id
+     JOIN budget_groups g ON g.id = c.group_id
+     WHERE g.month_id = ? ORDER BY t.date DESC, t.id DESC LIMIT ?`,
+    [monthId, limit]
+  );
+}
+
+// ---------- reports ----------
+export interface MonthTotal {
+  id: number;
+  name: string;
+  spent: number;
+  budget: number;
+}
+
+export async function monthlyTotals(): Promise<MonthTotal[]> {
+  const d = await getDb();
+  return d.getAllAsync<MonthTotal>(
+    `SELECT m.id, m.name, m.total_budget AS budget,
+      COALESCE((SELECT SUM(t.amount) FROM transactions t
+        JOIN categories c ON c.id = t.category_id
+        JOIN budget_groups g ON g.id = c.group_id
+        WHERE g.month_id = m.id AND t.type = 'expense'), 0) AS spent
+     FROM months m ORDER BY m.id ASC`
+  );
+}
+
+export async function spendByGroup(monthId?: number): Promise<{ name: string; amount: number }[]> {
+  const d = await getDb();
+  const filt = monthId == null ? "" : "WHERE g.month_id = ?";
+  const params: (string | number)[] = monthId == null ? [] : [monthId];
+  return d.getAllAsync<{ name: string; amount: number }>(
+    `SELECT g.name,
+      COALESCE((SELECT SUM(t.amount) FROM transactions t
+        JOIN categories c ON c.id = t.category_id
+        WHERE c.group_id = g.id AND t.type = 'expense'), 0) AS amount
+     FROM budget_groups g ${filt} ORDER BY amount DESC`,
+    params
+  );
 }

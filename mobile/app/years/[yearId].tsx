@@ -1,34 +1,37 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, FlatList, StyleSheet, View } from "react-native";
+import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { createMonth, deleteMonth, getCurrency, listMonths } from "../../src/db";
+import { createMonth, deleteMonth, getCurrency, listMonthsWithNet, listYears, type MonthNet } from "../../src/db";
+import type { Year } from "../../src/types";
 import { formatCurrency } from "../../src/format";
-import { PAGE_SIZE, type Month } from "../../src/types";
-import { Btn, C, CenterLoad, Empty, Field, MonthRow, ROW_H, Sheet } from "../../src/ui";
+import { useTheme } from "../../src/theme";
+import { Btn, Card, CenterLoad, Chip, EmptyState, FAB, Field, MiniBars, MonthCard, Sheet, Toast } from "../../src/ui";
 
 export default function YearMonths() {
   const { yearId } = useLocalSearchParams<{ yearId: string }>();
   const yid = Number(yearId);
   const router = useRouter();
-  const [months, setMonths] = useState<Month[]>([]);
+  const t = useTheme();
+  const [years, setYears] = useState<Year[]>([]);
+  const [months, setMonths] = useState<MonthNet[]>([]);
   const [currency, setCurrencyState] = useState("$");
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [name, setName] = useState("");
   const [budget, setBudget] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [page, cur] = await Promise.all([
-        listMonths(yid, PAGE_SIZE, 0),
+      const [ys, ms, cur] = await Promise.all([
+        listYears(),
+        listMonthsWithNet(yid),
         getCurrency(),
       ]);
-      setMonths(page);
+      setYears(ys);
+      setMonths(ms);
       setCurrencyState(cur);
-      setHasMore(page.length === PAGE_SIZE);
     } finally {
       setLoading(false);
     }
@@ -43,17 +46,10 @@ export default function YearMonths() {
     }, [load])
   );
 
-  const loadMore = useCallback(async () => {
-    if (loading || loadingMore || !hasMore) return;
-    setLoadingMore(true);
-    try {
-      const page = await listMonths(yid, PAGE_SIZE, months.length);
-      setMonths((p) => [...p, ...page]);
-      setHasMore(page.length === PAGE_SIZE);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [loading, loadingMore, hasMore, yid, months.length]);
+  const say = useCallback((m: string) => {
+    setToast(m);
+    setTimeout(() => setToast(null), 1800);
+  }, []);
 
   const onCreate = useCallback(async () => {
     if (!name.trim()) return;
@@ -63,10 +59,11 @@ export default function YearMonths() {
       setBudget("");
       setShowNew(false);
       load();
+      say("Saved ✓");
     } catch (e) {
       Alert.alert("Error", (e as Error).message);
     }
-  }, [yid, name, budget, load]);
+  }, [yid, name, budget, load, say]);
 
   const onDelete = useCallback(
     (id: number) => {
@@ -78,43 +75,75 @@ export default function YearMonths() {
     [load]
   );
 
+  const goYear = useCallback(
+    (id: number) => {
+      if (id !== yid) router.replace({ pathname: "/years/[yearId]", params: { yearId: String(id) } });
+    },
+    [router, yid]
+  );
+
   if (loading) return <CenterLoad />;
+  const current = years.find((y) => y.id === yid);
   return (
-    <View style={s.wrap}>
-      <Btn title="+ Month" onPress={() => setShowNew(true)} />
+    <View style={[s.wrap, { backgroundColor: t.bg }]}>
+      <Text style={[s.h1, { color: t.text }]}>{current?.name ?? "Months"}</Text>
+      {years.length > 1 ? (
+        <FlatList
+          horizontal
+          data={years}
+          keyExtractor={(y) => String(y.id)}
+          contentContainerStyle={s.pills}
+          showsHorizontalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <Chip label={item.name} selected={item.id === yid} onPress={() => goYear(item.id)} />
+          )}
+        />
+      ) : null}
+      {months.length > 0 ? (
+        <Card>
+          <Text style={[s.h2, { color: t.text }]}>Balance per month</Text>
+          <MiniBars values={months.map((m) => m.net)} />
+        </Card>
+      ) : null}
       {months.length === 0 ? (
-        <Empty title="No months" hint="Add your first month." />
+        <EmptyState title="No months" hint="Add your first month." />
       ) : (
         <FlatList
           data={months}
+          numColumns={2}
           keyExtractor={(m) => String(m.id)}
-          getItemLayout={(_, i) => ({ length: ROW_H, offset: ROW_H * i, index: i })}
           windowSize={7}
           maxToRenderPerBatch={20}
           removeClippedSubviews
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          contentContainerStyle={s.list}
+          contentContainerStyle={s.grid}
+          columnWrapperStyle={s.row}
           renderItem={({ item }) => (
-            <MonthRow
+            <MonthCard
               name={item.name}
-              budget={formatCurrency(item.total_budget, currency)}
+              net={formatCurrency(item.net, currency)}
+              positive={item.net >= 0}
               onPress={() => router.push({ pathname: "/months/[monthId]", params: { monthId: String(item.id) } })}
               onDelete={() => onDelete(item.id)}
             />
           )}
         />
       )}
-      <Sheet visible={showNew} onClose={() => setShowNew(false)} title="New month">
+      <FAB onPress={() => setShowNew(true)} label="Add month" />
+      <Sheet visible={showNew} onClose={() => setShowNew(false)} title="Add month">
         <Field value={name} onChange={setName} placeholder="e.g. July 2026" />
         <Field value={budget} onChange={setBudget} placeholder="Budget" numeric />
-        <Btn title="Create" onPress={onCreate} />
+        <Btn title="Save" onPress={onCreate} block />
       </Sheet>
+      <Toast message={toast} />
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: C.bg, padding: 12, gap: 10 },
-  list: { gap: 8, paddingBottom: 24 },
+  wrap: { flex: 1, padding: 20 },
+  h1: { fontSize: 28, fontWeight: "800", marginBottom: 8 },
+  h2: { fontSize: 20, fontWeight: "700", marginBottom: 8 },
+  pills: { gap: 8, paddingBottom: 12 },
+  grid: { gap: 12, paddingBottom: 96 },
+  row: { gap: 12 },
 });
