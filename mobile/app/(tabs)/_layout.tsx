@@ -10,7 +10,7 @@ function TabIcon({ label, color }: { label: string; color: any }) {
 }
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme() ?? 'light';
 
   return (
     <Tabs
