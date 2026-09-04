@@ -1,8 +1,10 @@
 # FinTracker — Mobile (Expo, local-only)
 
-> **Migrated Web → Mobile (local-only) — Sep 2026.** All data, transactions, budgets run offline on device via `expo-sqlite`. No cloud/backend. Web removed in cutover — see `git tag mobile-cutover`.
+Offline finance tracker. All data (years, months, groups, categories, transactions) lives on-device via `expo-sqlite`. No cloud/backend.
 
-## Quick Start (Mobile — primary)
+> **Rewritten Sep 2026** (stateless components + FlatList virtualization) after the old app was deleted for list-scroll performance issues. Old code retrievable via `git tag mobile-cutover`.
+
+## Quick Start
 
 ```sh
 cd mobile && npm install
@@ -11,33 +13,51 @@ cd mobile && npm run start      # scan QR with Expo Go
 cd mobile && npm run android    # or ios / web
 ```
 
-- DB: `expo-sqlite` `finance.db`, 7 migrations (`mobile/src/db/migrations.ts` ← `backend/src/migrations/*`), `PRAGMA foreign_keys=ON`.
-- API shim: `mobile/src/api/index.ts` calls `mobile/src/services/*` directly (no `fetch /api`).
-- UI: NativeWind + `mobile/src/components/ui/*` (RN `Pressable`/`Modal` replaces shadcn `@base-ui/react`).
-- Charts: `mobile/src/components/GroupChart.tsx` (View-based, no `window`/`recharts`).
-- Exports: `mobile/src/utils/export.ts` → `expo-file-system` + `expo-sharing` + `xlsx`/`jspdf`.
+## Run in the Android emulator (from VSCode)
 
-See `MIGRATION_STAGES.md` for 8 staged migrations (0–8 all `[x]`).
+VSCode has no built-in app runner — you use its integrated terminal (`Terminal > New Terminal`). One-time setup (this machine has no Android SDK yet):
 
-## Archive
-
-Web removed. Retrieve original web via:
+1. Install Android Studio (bundles the Android SDK + emulator).
+2. Open Android Studio → Device Manager → Create Device (e.g. Pixel 7, recent API) → launch it once so it boots.
+3. In VSCode, open this repo folder and run:
 
 ```sh
-git show mobile-cutover:frontend/   # or
-git checkout mobile-cutover -- frontend backend
+cd mobile && npm install
+cd mobile && npm run android
 ```
+
+Expo finds the running emulator and opens the app in Expo Go on it. If it can't locate the SDK, set `ANDROID_HOME` to your SDK path (default `C:\Users\<you>\AppData\Local\Android\Sdk`), restart VSCode, and retry.
+
+Notes: iOS simulator requires macOS. Physical phone also works — `npm run start` and scan the QR with Expo Go.
+
+### Troubleshooting: `npm` is not recognized
+
+You likely use nvm-windows and the terminal has a stale `PATH`: fully quit VSCode (not just reload), reopen, and check `node -v` / `npm -v`. If still broken, replace the `%NVM_SYMLINK%` entry in your User `PATH` with the literal path `C:\nvm4w\nodejs`, then restart VSCode.
 
 ## Project Structure
 
 ```
-mobile/  # Expo 57 + expo-router + expo-sqlite + NativeWind (source of truth)
-  app/   # (tabs)/index( Dashboard) /years /settings + stack: years/[id] months/[id] groups/[id] categories/[id]
-  src/db, repositories, services, api, contexts, components/ui, utils
+mobile/  # Expo SDK 53 + expo-router + expo-sqlite + StyleSheet (source of truth)
+  app/
+    _layout.tsx            # Stack + initDb() once
+    index.tsx              # Dashboard (stats + years)
+    settings.tsx           # Currency symbol
+    years/[yearId].tsx     # Months of a year
+    months/[monthId].tsx   # Groups of a month
+    groups/[groupId].tsx   # Categories of a group
+    categories/[categoryId].tsx  # Transactions + CSV export
+  src/
+    db.ts     # SQLite singleton, schema + indexes, SQL aggregates, pagination
+    ui.tsx    # Stateless memo'd components (props-only, no useState inside)
+    types.ts  # Entities + summaries (PAGE_SIZE = 50)
+    format.ts # formatCurrency, todayISO, pct
 ```
 
-## Tradeoffs (see MIGRATION_STAGES.md Stack Decision)
+## How It Works
 
-- **Expo vs Capacitor:** Expo chosen for true native UX; Capacitor would be simpler (wrap web SPA, keep recharts/tailwind) but WebView jank.
-- **expo-sqlite vs AsyncStorage:** SQLite required for FK cascades + joins (`sumExpensesByCategories`), not KV.
-- **NativeWind vs StyleSheet:** NativeWind retains Tailwind mental model; fully StyleSheet would be simpler but larger diff.
+- **Data:** single `src/db.ts` module (`finance.db`, WAL, FKs on). Years → months → budget groups → categories → transactions (+ `_meta` for settings).
+- **UI:** stateless components in `src/ui.tsx` — state lives in screens, data in `src/db.ts`.
+- **Performance:** `FlatList` virtualization with fixed row heights, paginated queries (`LIMIT`/`OFFSET`), totals computed in SQL, no chart/NativeWind runtime.
+- **Export:** per-category CSV via `expo-file-system` + `expo-sharing`.
+
+See `AGENTS.md` for agent build/verify commands and perf rules.

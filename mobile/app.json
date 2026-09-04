@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "FinTracker",
+    "slug": "fintracker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "fintracker",
+    "newArchEnabled": true,
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

@@ -1,7 +1,30 @@
 mobile/node_modules/
 mobile/.expo/
+mobile/.expo-shared/
 mobile/dist/
 mobile/web-build/
+
+# logs
+*.log
+npm-debug.log*
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# local env / secrets
+.env
+.env.local
+
+# local sqlite copies (real DB lives on-device)
+*.db
+*.db-journal
+*.sqlite
+
+# coverage
+coverage/
 
 AGENTS.md
 GUIDE.md
