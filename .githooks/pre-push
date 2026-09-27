@@ -1,0 +1,27 @@
+#!/bin/sh
+# Pre-push gate: lint + android prebuild must pass, else the push is blocked.
+# Cleanup (prebuild side-effects) runs on both pass and fail paths.
+# Setup (once per clone): git config core.hooksPath .githooks
+set -e
+cd "$(git rev-parse --show-toplevel)/mobile" || exit 1
+
+# Never destroy the user's own uncommitted package.json edits:
+# only restore the file if prebuild was the one to dirty it.
+if git diff --quiet -- package.json; then PKG_CLEAN=1; else PKG_CLEAN=0; fi
+cleanup() {
+  if [ "$PKG_CLEAN" = 1 ]; then git checkout -- package.json 2>/dev/null || true; fi
+  rm -rf android
+}
+
+echo "▶ pre-push: lint (tsc --noEmit)"
+npm run lint || exit 1
+
+echo "▶ pre-push: prebuild (android)"
+if ! npx expo prebuild --platform android; then
+  cleanup
+  echo "✘ pre-push: prebuild failed — push blocked"
+  exit 1
+fi
+
+cleanup
+echo "✔ pre-push checks passed"
