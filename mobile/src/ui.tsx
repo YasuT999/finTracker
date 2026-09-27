@@ -46,7 +46,7 @@ export const Btn = memo(function Btn(props: {
         style={[
           s.btnText,
           sm && s.btnTextSm,
-          { color: v === "primary" || v === "danger" ? "#FFFFFF" : t.text },
+          { color: v === "primary" ? t.onPrimary : v === "danger" ? "#FFFFFF" : t.text },
         ]}
       >
         {props.title}
@@ -63,7 +63,7 @@ export const FAB = memo(function FAB(props: { onPress: () => void; label: string
       style={[s.fab, { backgroundColor: t.primary }]}
       accessibilityLabel={props.label}
     >
-      <Text style={s.fabText}>+</Text>
+      <Text style={[s.fabText, { color: t.onPrimary }]}>+</Text>
     </Pressable>
   );
 });
@@ -82,7 +82,7 @@ export const Stat = memo(function Stat(props: { label: string; value: string }) 
       <Text style={[s.statVal, { color: t.text }]} numberOfLines={1}>
         {props.value}
       </Text>
-      <Text style={[s.caption, { color: t.sub }]}>{props.label}</Text>
+      <Text style={[s.statLabel, { color: t.sub }]}>{props.label}</Text>
     </View>
   );
 });
@@ -114,7 +114,7 @@ export const BarChart = memo(function BarChart(props: {
             <View
               style={{
                 width: 14,
-                borderRadius: 7,
+                borderRadius: 3,
                 height: Math.max(4, (d.value / max) * (h - 24)),
                 backgroundColor: d.color ?? t.primary,
               }}
@@ -140,7 +140,7 @@ export const MiniBars = memo(function MiniBars(props: { values: number[]; height
           key={i}
           style={{
             flex: 1,
-            borderRadius: 3,
+            borderRadius: 2,
             height: Math.max(3, (Math.abs(v) / max) * h),
             backgroundColor: v >= 0 ? t.success : t.danger,
             opacity: v === 0 ? 0.25 : 1,
@@ -187,7 +187,7 @@ export const DonutChart = memo(function DonutChart(props: {
               top: D / 2 - 9,
               width: RING,
               height: 18,
-              borderRadius: 9,
+              borderRadius: 4,
               backgroundColor: tk.color,
               transform: [{ rotate: `${tk.deg}deg` }, { translateY: -r }],
             }}
@@ -270,7 +270,7 @@ export const Chip = memo(function Chip(props: {
       ]}
     >
       {props.dot ? <View style={[s.dot, { backgroundColor: props.dot }]} /> : null}
-      <Text style={[s.chipText, { color: sel ? "#FFFFFF" : t.text }]}>{props.label}</Text>
+      <Text style={[s.chipText, { color: sel ? t.onPrimary : t.text }]}>{props.label}</Text>
     </Pressable>
   );
 });
@@ -291,7 +291,7 @@ export const Segmented = memo(function Segmented(props: {
             onPress={() => props.onChange(o)}
             style={[s.segOpt, sel && { backgroundColor: t.primary }]}
           >
-            <Text style={[s.chipText, { color: sel ? "#FFFFFF" : t.sub }]}>{o}</Text>
+            <Text style={[s.chipText, { color: sel ? t.onPrimary : t.sub }]}>{o}</Text>
           </Pressable>
         );
       })}
@@ -329,8 +329,8 @@ export const Toast = memo(function Toast(props: { message: string | null }) {
   if (!props.message) return null;
   return (
     <View style={s.toastWrap} pointerEvents="none">
-      <View style={[s.toast, { backgroundColor: t.success }]}>
-        <Text style={s.toastText}>{props.message}</Text>
+      <View style={[s.toast, { backgroundColor: t.primary }]}>
+        <Text style={[s.toastText, { color: t.onPrimary }]}>{props.message}</Text>
       </View>
     </View>
   );
@@ -472,7 +472,7 @@ const s = StyleSheet.create({
   btnMd: { paddingVertical: 12, paddingHorizontal: 16 },
   btnSm: { paddingVertical: 8, paddingHorizontal: 12 },
   block: { width: "100%" },
-  btnText: { fontSize: 15, fontWeight: "700" },
+  btnText: { fontSize: 15, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
   btnTextSm: { fontSize: 13 },
   fab: {
     position: "absolute",
@@ -480,21 +480,22 @@ const s = StyleSheet.create({
     bottom: 24,
     width: 56,
     height: 56,
-    borderRadius: 28,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     elevation: 4,
   },
-  fabText: { color: "#fff", fontSize: 28, fontWeight: "400", marginTop: -2 },
+  fabText: { fontSize: 28, fontWeight: "600", marginTop: -2 },
   card: { borderRadius: R.card, padding: 16, borderWidth: 1 },
   statGrow: { flex: 1 },
-  statVal: { fontSize: 22, fontWeight: "800" },
+  statVal: { fontSize: 26, fontWeight: "700", letterSpacing: -0.5, fontVariant: ["tabular-nums"] },
+  statLabel: { fontSize: 11, fontWeight: "600", letterSpacing: 1, textTransform: "uppercase", marginTop: 4 },
   caption: { fontSize: 12, fontWeight: "500", marginTop: 2 },
   body: { fontSize: 15 },
-  h2: { fontSize: 20, fontWeight: "700", marginBottom: 8 },
-  yearTitle: { fontSize: 22, fontWeight: "800" },
-  rowTitle: { fontSize: 15, fontWeight: "600" },
-  amount: { fontSize: 15, fontWeight: "800", marginTop: 4 },
+  h2: { fontSize: 17, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 8 },
+  yearTitle: { fontSize: 24, fontWeight: "700", letterSpacing: -0.3 },
+  rowTitle: { fontSize: 15, fontWeight: "600", letterSpacing: -0.2 },
+  amount: { fontSize: 16, fontWeight: "700", letterSpacing: -0.2, marginTop: 4, fontVariant: ["tabular-nums"] },
   chev: { fontSize: 24, fontWeight: "300", marginHorizontal: 4 },
   del: { fontSize: 13, marginLeft: 8 },
   delSm: { fontSize: 13, marginLeft: 4 },
@@ -505,7 +506,7 @@ const s = StyleSheet.create({
   chartBarWrap: { justifyContent: "flex-end" },
   miniRow: { flexDirection: "row", alignItems: "flex-end", gap: 4 },
   donutCenter: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center" },
-  donutVal: { fontSize: 20, fontWeight: "800" },
+  donutVal: { fontSize: 20, fontWeight: "700", letterSpacing: -0.3, fontVariant: ["tabular-nums"] },
   legend: { gap: 8, marginTop: 12 },
   legendRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   dot: { width: 10, height: 10, borderRadius: 5 },
@@ -522,25 +523,25 @@ const s = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
   },
-  chipText: { fontSize: 13, fontWeight: "600" },
+  chipText: { fontSize: 13, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
   seg: { flexDirection: "row", borderWidth: 1, borderRadius: R.btn, padding: 4, gap: 4 },
   segOpt: { flex: 1, borderRadius: 8, paddingVertical: 10, alignItems: "center" },
   sheetBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   sheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
     borderWidth: 1,
     borderBottomWidth: 0,
     padding: 20,
     paddingBottom: 32,
     gap: 6,
   },
-  grab: { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 8 },
+  grab: { width: 48, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 8 },
   toastWrap: { position: "absolute", left: 0, right: 0, bottom: 100, alignItems: "center" },
   toast: { borderRadius: R.tag, paddingVertical: 10, paddingHorizontal: 18 },
-  toastText: { color: "#fff", fontWeight: "700" },
+  toastText: { fontWeight: "700", letterSpacing: 0.3 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 8 },
-  emptyArt: { width: 96, height: 96, borderRadius: 48, borderWidth: 1, alignItems: "center", justifyContent: "center", marginBottom: 8 },
+  emptyArt: { width: 96, height: 96, borderRadius: 20, borderWidth: 1, alignItems: "center", justifyContent: "center", marginBottom: 8 },
   emptyGlyph: { fontSize: 44, fontWeight: "300" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   rowCard: {
