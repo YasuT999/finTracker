@@ -2,15 +2,12 @@
   "expo": {
     "name": "Expense Tracker",
     "slug": "fintracker",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "scheme": "fintracker",
     "newArchEnabled": true,
     "android": {
-      "package": "com.fintracker.app",
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "package": "com.fintracker.app"
     },
     "plugins": [
       "expo-router",
@@ -28,11 +25,7 @@
       "typedRoutes": false
     },
     "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "31c661ae-ca76-4dfe-bc67-c383bf34ca62"
-      }
-    },
-    "owner": "yaswanth_999"
+      "router": {}
+    }
   }
 }

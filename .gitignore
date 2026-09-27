@@ -1,4 +1,5 @@
 mobile/node_modules/
+mobile/android/
 mobile/.expo/
 mobile/.expo-shared/
 mobile/dist/
@@ -22,6 +23,10 @@ Thumbs.db
 *.db
 *.db-journal
 *.sqlite
+
+# android signing secrets (never commit)
+*.keystore
+keystore_base64.txt
 
 # coverage
 coverage/
