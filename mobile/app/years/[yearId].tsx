@@ -5,7 +5,7 @@ import { createMonth, deleteMonth, getCurrency, listMonthsWithNet, listYears, ty
 import type { Year } from "../../src/types";
 import { formatCurrency } from "../../src/format";
 import { useTheme } from "../../src/theme";
-import { Btn, Card, CenterLoad, Chip, EmptyState, FAB, Field, MiniBars, MonthCard, Sheet, Toast, useTopPad } from "../../src/ui";
+import { Btn, Card, CenterLoad, EmptyState, FAB, Field, MiniBars, MonthCard, Sheet, Toast, useTopPad } from "../../src/ui";
 
 export default function YearMonths() {
   const { yearId } = useLocalSearchParams<{ yearId: string }>();
@@ -76,30 +76,11 @@ export default function YearMonths() {
     [load]
   );
 
-  const goYear = useCallback(
-    (id: number) => {
-      if (id !== yid) router.replace({ pathname: "/years/[yearId]", params: { yearId: String(id) } });
-    },
-    [router, yid]
-  );
-
   if (loading) return <CenterLoad />;
   const current = years.find((y) => y.id === yid);
   return (
     <View style={[s.wrap, { backgroundColor: t.bg, paddingTop: topPad }]}>
       <Text style={[s.h1, { color: t.text }]}>{current?.name ?? "Months"}</Text>
-      {years.length > 1 ? (
-        <FlatList
-          horizontal
-          data={years}
-          keyExtractor={(y) => String(y.id)}
-          contentContainerStyle={s.pills}
-          showsHorizontalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <Chip label={item.name} selected={item.id === yid} onPress={() => goYear(item.id)} />
-          )}
-        />
-      ) : null}
       {months.length > 0 ? (
         <Card>
           <Text style={[s.h2, { color: t.text }]}>Balance per month</Text>
@@ -144,7 +125,6 @@ const s = StyleSheet.create({
   wrap: { flex: 1, padding: 20 },
   h1: { fontSize: 30, fontWeight: "700", letterSpacing: -0.5, marginBottom: 8 },
   h2: { fontSize: 20, fontWeight: "700", marginBottom: 8 },
-  pills: { gap: 8, paddingBottom: 12 },
   grid: { gap: 12, paddingBottom: 96 },
   row: { gap: 12 },
 });
