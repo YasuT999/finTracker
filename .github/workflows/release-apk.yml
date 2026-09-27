@@ -1,0 +1,47 @@
+name: Release APK
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - mobile/app.json
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read app version
+        id: ver
+        run: node -p "'version=' + require('./app.json').expo.version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - run: npm ci
+
+      - name: EAS cloud build (production APK)
+        run: eas build --platform android --profile production --non-interactive --wait --output ../app-release.apk
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          files: app-release.apk
+          generate_release_notes: true

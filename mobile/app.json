@@ -6,6 +6,12 @@
     "orientation": "portrait",
     "scheme": "fintracker",
     "newArchEnabled": true,
+    "android": {
+      "package": "com.fintracker.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
     "plugins": [
       "expo-router",
       "expo-sharing",
@@ -20,6 +26,13 @@
     ],
     "experiments": {
       "typedRoutes": false
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "31c661ae-ca76-4dfe-bc67-c383bf34ca62"
+      }
+    },
+    "owner": "yaswanth_999"
   }
 }
