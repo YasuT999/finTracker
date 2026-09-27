@@ -11,7 +11,6 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sharing",
       "expo-sqlite",
       "expo-status-bar",
       [
@@ -19,7 +18,8 @@
         {
           "photosPermission": "Allow Expense Tracker to access your photos to set a profile picture."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": false
