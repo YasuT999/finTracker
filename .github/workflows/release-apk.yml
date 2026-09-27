@@ -25,23 +25,78 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
-      - uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
       - run: npm ci
 
-      - name: EAS cloud build (production APK)
-        run: eas build --platform android --profile production --non-interactive --wait --output ../app-release.apk
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Generate native project
+        run: npx expo prebuild --platform android
+
+      - name: Wire release signing
+        run: |
+          python3 <<'EOF'
+          import pathlib
+          p = pathlib.Path("android/app/build.gradle")
+          s = p.read_text()
+          old_configs = """    signingConfigs {
+                  debug {
+                      storeFile file('debug.keystore')
+                      storePassword 'android'
+                      keyAlias 'androiddebugkey'
+                      keyPassword 'android'
+                  }
+              }"""
+          new_configs = """    signingConfigs {
+                  debug {
+                      storeFile file('debug.keystore')
+                      storePassword 'android'
+                      keyAlias 'androiddebugkey'
+                      keyPassword 'android'
+                  }
+                  release {
+                      storeFile file(findProperty('MYAPP_UPLOAD_STORE_FILE') ?: 'my-upload-key.keystore')
+                      storePassword findProperty('MYAPP_UPLOAD_STORE_PASSWORD')
+                      keyAlias findProperty('MYAPP_UPLOAD_KEY_ALIAS')
+                      keyPassword findProperty('MYAPP_UPLOAD_KEY_PASSWORD')
+                  }
+              }"""
+          assert old_configs in s, "signingConfigs template changed — update Wire release signing patch"
+          s = s.replace(old_configs, new_configs)
+          old_release = "            signingConfig signingConfigs.debug\n            def enableShrinkResources"
+          new_release = "            signingConfig signingConfigs.release\n            def enableShrinkResources"
+          assert old_release in s, "release buildType template changed — update Wire release signing patch"
+          s = s.replace(old_release, new_release)
+          p.write_text(s)
+          EOF
+
+      - name: Decode keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/my-upload-key.keystore
+
+      - name: Build signed APK
+        working-directory: mobile/android
+        run: >
+          ./gradlew assembleRelease
+          -PMYAPP_UPLOAD_STORE_FILE=my-upload-key.keystore
+          -PMYAPP_UPLOAD_STORE_PASSWORD="${{ secrets.ANDROID_STORE_PASSWORD }}"
+          -PMYAPP_UPLOAD_KEY_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}"
+          -PMYAPP_UPLOAD_KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
+
+      - name: Rename APK with file version
+        run: mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/app-v${{ steps.ver.outputs.version }}.apk
 
       - name: Publish to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.version }}
-          files: app-release.apk
+          name: Release v${{ steps.ver.outputs.version }}
+          files: mobile/android/app/build/outputs/apk/release/app-v${{ steps.ver.outputs.version }}.apk
           generate_release_notes: true
