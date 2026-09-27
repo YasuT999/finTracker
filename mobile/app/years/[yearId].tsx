@@ -5,7 +5,7 @@ import { createMonth, deleteMonth, getCurrency, listMonthsWithNet, listYears, ty
 import type { Year } from "../../src/types";
 import { formatCurrency } from "../../src/format";
 import { useTheme } from "../../src/theme";
-import { Btn, Card, CenterLoad, Chip, EmptyState, FAB, Field, MiniBars, MonthCard, Sheet, Toast } from "../../src/ui";
+import { Btn, Card, CenterLoad, Chip, EmptyState, FAB, Field, MiniBars, MonthCard, Sheet, Toast, useTopPad } from "../../src/ui";
 
 export default function YearMonths() {
   const { yearId } = useLocalSearchParams<{ yearId: string }>();
@@ -20,6 +20,7 @@ export default function YearMonths() {
   const [name, setName] = useState("");
   const [budget, setBudget] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const topPad = useTopPad();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,7 +86,7 @@ export default function YearMonths() {
   if (loading) return <CenterLoad />;
   const current = years.find((y) => y.id === yid);
   return (
-    <View style={[s.wrap, { backgroundColor: t.bg }]}>
+    <View style={[s.wrap, { backgroundColor: t.bg, paddingTop: topPad }]}>
       <Text style={[s.h1, { color: t.text }]}>{current?.name ?? "Months"}</Text>
       {years.length > 1 ? (
         <FlatList
@@ -141,7 +142,7 @@ export default function YearMonths() {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, padding: 20 },
-  h1: { fontSize: 28, fontWeight: "800", marginBottom: 8 },
+  h1: { fontSize: 30, fontWeight: "700", letterSpacing: -0.5, marginBottom: 8 },
   h2: { fontSize: 20, fontWeight: "700", marginBottom: 8 },
   pills: { gap: 8, paddingBottom: 12 },
   grid: { gap: 12, paddingBottom: 96 },

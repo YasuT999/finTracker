@@ -30,6 +30,7 @@ import {
   Stat,
   Toast,
   TxnRow,
+  useTopPad,
 } from "../../src/ui";
 
 function colorFor(name: string): string {
@@ -53,6 +54,7 @@ export default function MonthDashboard() {
   const [name, setName] = useState("");
   const [budget, setBudget] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const topPad = useTopPad();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -126,7 +128,7 @@ export default function MonthDashboard() {
 
   if (loading) return <CenterLoad />;
   return (
-    <View style={[s.wrap, { backgroundColor: t.bg }]}>
+    <View style={[s.wrap, { backgroundColor: t.bg, paddingTop: topPad }]}>
       <ScrollView contentContainerStyle={s.body}>
         <Text style={[s.h1, { color: t.text }]}>{summary?.name ?? ""}</Text>
         <Card>
@@ -223,10 +225,10 @@ export default function MonthDashboard() {
 const s = StyleSheet.create({
   wrap: { flex: 1 },
   body: { padding: 20, gap: 12, paddingBottom: 110 },
-  h1: { fontSize: 28, fontWeight: "800" },
+  h1: { fontSize: 30, fontWeight: "700", letterSpacing: -0.5 },
   h2: { fontSize: 20, fontWeight: "700" },
-  cap: { fontSize: 12, fontWeight: "600", textTransform: "uppercase" },
-  hero: { fontSize: 28, fontWeight: "800", marginVertical: 4 },
+  cap: { fontSize: 12, fontWeight: "600", letterSpacing: 1, textTransform: "uppercase" },
+  hero: { fontSize: 40, fontWeight: "700", letterSpacing: -1, marginVertical: 4, fontVariant: ["tabular-nums"] },
   stats: { flexDirection: "row", gap: 12, marginTop: 8 },
   chips: { gap: 8 },
   gap: { gap: 12 },

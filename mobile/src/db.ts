@@ -351,6 +351,55 @@ export async function setCurrency(symbol: string): Promise<void> {
   await d.runAsync("INSERT OR REPLACE INTO _meta (key, value) VALUES ('currency', ?)", [symbol]);
 }
 
+// ---------- profile (onboarding form + photo; offline-only) ----------
+export interface Profile {
+  name: string;
+  age: string;
+  gender: string;
+  email: string;
+  mobile: string;
+}
+
+export async function getProfile(): Promise<Profile | null> {
+  const raw = await getSetting("profile");
+  if (!raw) return null;
+  try {
+    const p = JSON.parse(raw) as Partial<Profile>;
+    if (p && typeof p.name === "string" && p.name.trim()) {
+      return {
+        name: p.name,
+        age: String(p.age ?? ""),
+        gender: String(p.gender ?? ""),
+        email: String(p.email ?? ""),
+        mobile: String(p.mobile ?? ""),
+      };
+    }
+  } catch {
+    // legacy installs stored a plain name string — fall through
+  }
+  const name = raw.trim();
+  return name ? { name, age: "", gender: "", email: "", mobile: "" } : null;
+}
+
+export async function setProfile(p: Profile): Promise<void> {
+  await setSetting("profile", JSON.stringify(p));
+}
+
+export async function clearProfile(): Promise<void> {
+  const d = await getDb();
+  await d.runAsync("DELETE FROM _meta WHERE key IN ('profile', 'profile_photo')");
+}
+
+export async function getProfilePhoto(): Promise<string | null> {
+  return getSetting("profile_photo");
+}
+
+export async function setProfilePhoto(uri: string): Promise<void> {
+  await setSetting("profile_photo", uri);
+}
+
+export const MAX_PHOTO_BYTES = 1024 * 1024;
+
 // ---------- generic settings (theme, onboarding, profile) ----------
 export async function getSetting(key: string): Promise<string | null> {
   const d = await getDb();

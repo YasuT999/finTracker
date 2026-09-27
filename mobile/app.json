@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "FinTracker",
+    "name": "Expense Tracker",
     "slug": "fintracker",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,7 +10,13 @@
       "expo-router",
       "expo-sharing",
       "expo-sqlite",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Expense Tracker to access your photos to set a profile picture."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false

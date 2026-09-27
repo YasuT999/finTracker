@@ -6,6 +6,7 @@ export interface T {
   nav: string;
   border: string;
   primary: string;
+  primaryDeep: string;
   onPrimary: string;
   success: string;
   danger: string;
@@ -15,57 +16,58 @@ export interface T {
   sub: string;
 }
 
-// Dark = Lamborghini rich: absolute black canvas, charcoal surface,
-// vivid gold CTA with near-black text. Light = Apple clarity: parchment
-// canvas, white cards, ink text, deep antique gold so fills + links stay
-// readable on white.
+// Apple finance palette.
+// Blue = stability/trust (primary actions). Green/red = high-contrast
+// functional indicators (growth vs loss). Neutrals (charcoal/slate/white)
+// keep dense dashboards readable.
 export const Dark: T = {
-  bg: "#000000",
-  card: "#181818",
-  nav: "#000000",
-  border: "#2A2A2A",
-  primary: "#FFC000",
-  onPrimary: "#1A1A1A",
-  success: "#3DDC84",
-  danger: "#FF6B7A",
-  warning: "#FFCE3E",
-  accent: "#29ABE2",
-  text: "#FFFFFF",
-  sub: "#A3A3A3",
+  bg: "#101418",
+  card: "#1A2029",
+  nav: "#101418",
+  border: "#2A3340",
+  primary: "#2997FF",
+  primaryDeep: "#1E6FBD",
+  onPrimary: "#FFFFFF",
+  success: "#4ADE80",
+  danger: "#F87171",
+  warning: "#FBBF24",
+  accent: "#38BDF8",
+  text: "#F1F5F9",
+  sub: "#94A3B8",
 };
 
 export const Light: T = {
-  bg: "#F5F5F7",
+  bg: "#F2F4F7",
   card: "#FFFFFF",
   nav: "#FFFFFF",
-  border: "#E6E6E6",
-  primary: "#917300",
+  border: "#E2E8F0",
+  primary: "#0066CC",
+  primaryDeep: "#004E9E",
   onPrimary: "#FFFFFF",
   success: "#16A34A",
-  danger: "#E5485D",
-  warning: "#E8930C",
-  accent: "#3860BE",
+  danger: "#DC2626",
+  warning: "#B45309",
+  accent: "#0A84FF",
   text: "#1D1D1F",
-  sub: "#7D7D7D",
+  sub: "#64748B",
 };
 
 export type Mode = "dark" | "light";
 
-// Apple pill heritage tightened toward Lambo angularity: architectural
-// corners, sharp tag chips, no full pills except FAB medallion.
-export const R = { card: 14, btn: 10, input: 10, tag: 8 };
+// Apple grammar: pill actions/chips, 18px utility cards, blue-led charts
+// readable on charcoal and white canvases.
+export const R = { card: 18, btn: 9999, input: 9999, tag: 9999 };
 
-// Gold-led classic metallics: readable as fills on both black and
-// parchment canvases (no neon, no pure-white slices).
+// Blue-led categorical set; green/red stay reserved for profit/loss.
 export const CHART_COLORS = [
-  "#D9A900",
-  "#C98A3D",
-  "#8C8C8C",
-  "#2E9E6B",
-  "#D1604D",
-  "#5B8DC9",
-  "#A67C52",
-  "#6E6E73",
+  "#0A84FF",
+  "#5E5CE6",
+  "#64D2FF",
+  "#30B0C7",
+  "#FF9F0A",
+  "#C7A57A",
+  "#94A3B8",
+  "#64748B",
 ];
 
 const Ctx = createContext<T>(Dark);

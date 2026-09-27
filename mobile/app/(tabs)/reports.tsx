@@ -4,7 +4,7 @@ import { useFocusEffect } from "expo-router";
 import { getCurrency, monthlyTotals, spendByGroup, type MonthTotal } from "../../src/db";
 import { formatCurrency } from "../../src/format";
 import { useTheme } from "../../src/theme";
-import { BarChart, Card, CenterLoad, DonutChart, EmptyState, Stat } from "../../src/ui";
+import { BarChart, Card, CenterLoad, DonutChart, EmptyState, Stat, useTopPad } from "../../src/ui";
 
 export default function Reports() {
   const t = useTheme();
@@ -34,11 +34,12 @@ export default function Reports() {
   );
 
   const fmt = useCallback((n: number) => formatCurrency(n, currency), [currency]);
+  const topPad = useTopPad();
 
   if (loading) return <CenterLoad />;
   if (months.length === 0)
     return (
-      <View style={[s.wrap, { backgroundColor: t.bg }]}>
+      <View style={[s.wrap, { backgroundColor: t.bg, paddingTop: topPad }]}>
         <Text style={[s.h1, { color: t.text }]}>Reports</Text>
         <EmptyState title="No data yet" hint="Add months and transactions to see reports." />
       </View>
@@ -46,7 +47,7 @@ export default function Reports() {
 
   const total = months.reduce((sum, m) => sum + m.spent, 0);
   return (
-    <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={s.wrap}>
+    <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={[s.wrap, { paddingTop: topPad }]}>
       <Text style={[s.h1, { color: t.text }]}>Reports</Text>
       <Card>
         <Stat label="Total spent" value={fmt(total)} />
@@ -71,6 +72,6 @@ export default function Reports() {
 
 const s = StyleSheet.create({
   wrap: { padding: 20, gap: 12, paddingBottom: 32 },
-  h1: { fontSize: 28, fontWeight: "800" },
+  h1: { fontSize: 30, fontWeight: "700", letterSpacing: -0.5 },
   h2: { fontSize: 20, fontWeight: "700", marginBottom: 8 },
 });

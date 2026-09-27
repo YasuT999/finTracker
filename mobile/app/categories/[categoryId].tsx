@@ -16,7 +16,7 @@ import {
 import { formatCurrency } from "../../src/format";
 import { CHART_COLORS, useTheme } from "../../src/theme";
 import { PAGE_SIZE, type CategorySummary, type Transaction } from "../../src/types";
-import { Btn, Card, CenterLoad, EmptyState, FAB, Stat, Toast, TxnRow, TXN_H } from "../../src/ui";
+import { Btn, Card, CenterLoad, EmptyState, FAB, Stat, Toast, TxnRow, TXN_H, useTopPad } from "../../src/ui";
 
 function colorFor(name: string): string {
   let h = 0;
@@ -37,6 +37,7 @@ export default function CategoryTxns() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const topPad = useTopPad();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -126,7 +127,7 @@ export default function CategoryTxns() {
 
   if (loading) return <CenterLoad />;
   return (
-    <View style={[s.wrap, { backgroundColor: t.bg }]}>
+    <View style={[s.wrap, { backgroundColor: t.bg, paddingTop: topPad }]}>
       <Text style={[s.h1, { color: t.text }]}>{summary?.name ?? ""}</Text>
       <Card>
         <View style={s.stats}>
@@ -183,7 +184,7 @@ export default function CategoryTxns() {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, padding: 20, gap: 12 },
-  h1: { fontSize: 28, fontWeight: "800" },
+  h1: { fontSize: 30, fontWeight: "700", letterSpacing: -0.5 },
   stats: { flexDirection: "row", gap: 12, marginBottom: 6 },
   sub: { fontSize: 12 },
   bar: { flexDirection: "row", gap: 8 },

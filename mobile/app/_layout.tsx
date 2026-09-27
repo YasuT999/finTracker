@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { getSetting, initDb, setSetting } from "../src/db";
 import { Dark, Light, ModeCtx, ThemeCtx, type Mode } from "../src/theme";
 import { CenterLoad } from "../src/ui";
@@ -31,6 +32,7 @@ export default function Layout() {
 
   if (!ready) return <CenterLoad />;
   return (
+    <SafeAreaProvider>
     <ThemeCtx.Provider value={mode === "dark" ? Dark : Light}>
       <ModeCtx.Provider value={{ mode, setMode }}>
         <StatusBar style={mode === "dark" ? "light" : "dark"} />
@@ -46,5 +48,6 @@ export default function Layout() {
         </Stack>
       </ModeCtx.Provider>
     </ThemeCtx.Provider>
+    </SafeAreaProvider>
   );
 }

@@ -16,7 +16,7 @@ import type { BudgetGroup, CategorySummary } from "../../src/types";
 import { formatCurrency } from "../../src/format";
 import { CHART_COLORS, useTheme } from "../../src/theme";
 import { PAGE_SIZE } from "../../src/types";
-import { Btn, CenterLoad, Chip, EmptyState, FAB, Field, Segmented, Sheet, Toast, TxnRow, TXN_H } from "../../src/ui";
+import { Btn, CenterLoad, Chip, EmptyState, FAB, Field, Segmented, Sheet, Toast, TxnRow, TXN_H, useTopPad } from "../../src/ui";
 
 const FILTERS = ["All", "Income", "Expense"] as const;
 
@@ -45,6 +45,7 @@ export default function GroupDetail() {
   const [catName, setCatName] = useState("");
   const [catBudget, setCatBudget] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const topPad = useTopPad();
 
   const f = filter === "All" ? "all" : filter === "Income" ? "income" : "expense";
 
@@ -130,7 +131,7 @@ export default function GroupDetail() {
 
   if (loading) return <CenterLoad />;
   return (
-    <View style={[s.wrap, { backgroundColor: t.bg }]}>
+    <View style={[s.wrap, { backgroundColor: t.bg, paddingTop: topPad }]}>
       <View style={s.head}>
         <View style={[s.dotLg, { backgroundColor: t.accent }]} />
         <View style={s.grow}>
@@ -201,9 +202,9 @@ export default function GroupDetail() {
 const s = StyleSheet.create({
   wrap: { flex: 1, padding: 20, gap: 12 },
   head: { flexDirection: "row", alignItems: "center", gap: 10 },
-  dotLg: { width: 16, height: 16, borderRadius: 8 },
+  dotLg: { width: 16, height: 16, borderRadius: 3, transform: [{ rotate: "45deg" }] },
   grow: { flex: 1 },
-  h1: { fontSize: 28, fontWeight: "800" },
+  h1: { fontSize: 30, fontWeight: "700", letterSpacing: -0.5 },
   sub: { fontSize: 13, marginTop: 2 },
   chips: { gap: 8 },
   list: { gap: 8, paddingBottom: 110 },

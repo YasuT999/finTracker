@@ -8,16 +8,28 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: t.nav, borderTopColor: t.border },
+        tabBarStyle: { backgroundColor: t.nav, borderTopColor: t.border, borderTopWidth: 1 },
         tabBarActiveTintColor: t.primary,
         tabBarInactiveTintColor: t.sub,
+        tabBarLabelStyle: { fontSize: 10, fontWeight: "500" },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color, size }) => <MaterialIcons name="home" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="account-balance-wallet" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="years"
+        options={{
+          title: "Years",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="calendar-month" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -25,16 +37,16 @@ export default function TabsLayout() {
         options={{
           title: "Reports",
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="bar-chart" size={size} color={color} />
+            <MaterialIcons name="pie-chart" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="profile"
         options={{
-          title: "Settings",
+          title: "Profile",
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="settings" size={size} color={color} />
+            <MaterialIcons name="person" size={size} color={color} />
           ),
         }}
       />
