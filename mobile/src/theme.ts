@@ -16,24 +16,24 @@ export interface T {
   sub: string;
 }
 
-// Apple finance palette.
+// Sleek dark-mode palette: OLED black canvas, elevated charcoal cards,
+// electric blue + vivid pink interactive highlights, green/red status.
 // Blue = stability/trust (primary actions). Green/red = high-contrast
-// functional indicators (growth vs loss). Neutrals (charcoal/slate/white)
-// keep dense dashboards readable.
+// functional indicators (growth vs loss). Neutrals keep dense dashboards readable.
 export const Dark: T = {
-  bg: "#101418",
-  card: "#1A2029",
-  nav: "#101418",
-  border: "#2A3340",
-  primary: "#2997FF",
-  primaryDeep: "#1E6FBD",
+  bg: "#0A0A0C",
+  card: "#1C1C20",
+  nav: "#0A0A0C",
+  border: "#2E2E36",
+  primary: "#3B82F6",
+  primaryDeep: "#2563EB",
   onPrimary: "#FFFFFF",
-  success: "#4ADE80",
-  danger: "#F87171",
+  success: "#10B981",
+  danger: "#F43F5E",
   warning: "#FBBF24",
-  accent: "#38BDF8",
-  text: "#F1F5F9",
-  sub: "#94A3B8",
+  accent: "#EC4899",
+  text: "#EDEEF2",
+  sub: "#8B8B98",
 };
 
 export const Light: T = {
@@ -41,13 +41,13 @@ export const Light: T = {
   card: "#FFFFFF",
   nav: "#FFFFFF",
   border: "#E2E8F0",
-  primary: "#0066CC",
-  primaryDeep: "#004E9E",
+  primary: "#3B82F6",
+  primaryDeep: "#2563EB",
   onPrimary: "#FFFFFF",
-  success: "#16A34A",
-  danger: "#DC2626",
+  success: "#10B981",
+  danger: "#F43F5E",
   warning: "#B45309",
-  accent: "#0A84FF",
+  accent: "#EC4899",
   text: "#1D1D1F",
   sub: "#64748B",
 };
@@ -58,16 +58,17 @@ export type Mode = "dark" | "light";
 // readable on charcoal and white canvases.
 export const R = { card: 18, btn: 9999, input: 9999, tag: 9999 };
 
-// Blue-led categorical set; green/red stay reserved for profit/loss.
+// Blue/purple/pink-led categorical set (interactive highlights);
+// green/red stay reserved for profit/loss.
 export const CHART_COLORS = [
-  "#0A84FF",
-  "#5E5CE6",
-  "#64D2FF",
-  "#30B0C7",
-  "#FF9F0A",
-  "#C7A57A",
-  "#94A3B8",
-  "#64748B",
+  "#3B82F6",
+  "#8B5CF6",
+  "#EC4899",
+  "#10B981",
+  "#F43F5E",
+  "#FBBF24",
+  "#8B8B98",
+  "#5E5E6E",
 ];
 
 const Ctx = createContext<T>(Dark);

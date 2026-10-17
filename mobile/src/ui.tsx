@@ -14,8 +14,9 @@ import {
   View,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
-import { CHART_COLORS, R, useTheme } from "./theme";
+import { CHART_COLORS, R, useMode, useTheme } from "./theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export const ROW_H = 72;
@@ -87,9 +88,25 @@ export const FAB = memo(function FAB(props: { onPress: () => void; label: string
 
 // ---------- cards / stats ----------
 
+// Glass card: frosted blur fill + hairline border (dark & light tints).
 export const Card = memo(function Card(props: { children: ReactNode }) {
-  const t = useTheme();
-  return <View style={[s.card, { backgroundColor: t.card, borderColor: t.border }]}>{props.children}</View>;
+  const { mode } = useMode();
+  const dark = mode === "dark";
+  return (
+    <BlurView
+      intensity={dark ? 32 : 55}
+      tint={dark ? "dark" : "light"}
+      style={{
+        borderRadius: R.card,
+        backgroundColor: dark ? "rgba(28,28,32,0.55)" : "rgba(255,255,255,0.55)",
+        borderWidth: 1,
+        borderColor: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)",
+        overflow: "hidden",
+      }}
+    >
+      <View style={{ padding: 16 }}>{props.children}</View>
+    </BlurView>
+  );
 });
 
 export const Stat = memo(function Stat(props: { label: string; value: string }) {
@@ -230,6 +247,87 @@ export const DonutChart = memo(function DonutChart(props: {
           </View>
         ))}
       </View>
+    </View>
+  );
+});
+
+// Line = polyline of absolutely-positioned rotated segments (no deps).
+// Caller supplies measured width (state lives in screens).
+export const LineChart = memo(function LineChart(props: {
+  series: { name: string; color: string; values: number[] }[];
+  width: number;
+  height?: number;
+}) {
+  const t = useTheme();
+  const h = props.height ?? 168;
+  const padL = 58;
+  const padB = 20;
+  const padT = 8;
+  const n = Math.max(2, ...props.series.map((s) => s.values.length));
+  const max = Math.max(1, ...props.series.flatMap((s) => s.values));
+  const innerW = Math.max(20, props.width - padL - 8);
+  const innerH = h - padT - padB;
+  const X = (i: number) => padL + (i / (n - 1)) * innerW;
+  const Y = (v: number) => padT + innerH - (v / max) * innerH;
+
+  // Downsample to at most ~60 points per series (keeps View count sane).
+  const step = Math.max(1, Math.ceil((n - 1) / 60));
+  const grid = [max, max / 2, 0];
+  const compact = (v: number) =>
+    v >= 1e7 ? (v / 1e7).toFixed(1) + "Cr" : v >= 1e5 ? (v / 1e5).toFixed(1) + "L" : Math.round(v).toLocaleString("en-IN");
+
+  return (
+    <View style={{ width: props.width, height: h }}>
+      {grid.map((g, gi) => (
+        <View key={gi}>
+          <View
+            style={{
+              position: "absolute",
+              left: padL,
+              right: 8,
+              top: Y(g),
+              height: 1,
+              backgroundColor: t.border,
+            }}
+          />
+          <Text
+            style={[s.lineGridLabel, { color: t.sub, top: Y(g) - 7 }]}
+            numberOfLines={1}
+          >
+            {compact(g)}
+          </Text>
+        </View>
+      ))}
+      {props.series.map((ser) => {
+        const els: ReactNode[] = [];
+        for (let i = step; i < ser.values.length; i += step) {
+          const j = i - step;
+          const x1 = X(j);
+          const y1 = Y(ser.values[j]);
+          const x2 = X(i);
+          const y2 = Y(ser.values[i]);
+          const len = Math.hypot(x2 - x1, y2 - y1);
+          const angle = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
+          els.push(
+            <View
+              key={i}
+              style={{
+                position: "absolute",
+                left: (x1 + x2) / 2 - len / 2,
+                top: (y1 + y2) / 2 - 1,
+                width: len,
+                height: 2,
+                borderRadius: 1,
+                backgroundColor: ser.color,
+                transform: [{ rotate: `${angle}deg` }],
+              }}
+            />
+          );
+        }
+        return <View key={ser.name}>{els}</View>;
+      })}
+      <Text style={[s.lineCaption, { color: t.sub, left: padL, bottom: 0 }]}>0</Text>
+      <Text style={[s.lineCaption, { color: t.sub, right: 8, bottom: 0 }]}>{`${n - 1} mo`}</Text>
     </View>
   );
 });
@@ -541,7 +639,6 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  card: { borderRadius: R.card, padding: 16, borderWidth: 1 },
   statGrow: { flex: 1 },
   statVal: { fontSize: 26, fontWeight: "700", letterSpacing: -0.5, fontVariant: ["tabular-nums"] },
   statLabel: { fontSize: 12, fontWeight: "600", marginTop: 4 },
@@ -560,6 +657,16 @@ const s = StyleSheet.create({
   miniRow: { flexDirection: "row", alignItems: "flex-end", gap: 4 },
   donutCenter: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center" },
   donutVal: { fontSize: 20, fontWeight: "700", letterSpacing: -0.3, fontVariant: ["tabular-nums"] },
+  lineGridLabel: {
+    position: "absolute",
+    left: 0,
+    fontSize: 10,
+    fontWeight: "500",
+    fontVariant: ["tabular-nums"],
+    width: 52,
+    textAlign: "right",
+  },
+  lineCaption: { position: "absolute", fontSize: 10, fontWeight: "500" },
   legend: { gap: 8, marginTop: 12 },
   legendRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   legendName: { flex: 1, fontSize: 15 },
